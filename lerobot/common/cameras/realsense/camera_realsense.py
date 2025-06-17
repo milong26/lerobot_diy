@@ -352,7 +352,7 @@ class RealSenseCamera(Camera):
 
         return depth_map_processed
 
-    def read(self, color_mode: ColorMode | None = None, timeout_ms: int = 200) -> np.ndarray:
+    def read(self, color_mode: ColorMode | None = None, timeout_ms: int = 300) -> np.ndarray:
         """
         Reads a single frame (color) synchronously from the camera.
 
@@ -380,7 +380,7 @@ class RealSenseCamera(Camera):
         ret, frame = self.rs_pipeline.try_wait_for_frames(timeout_ms=timeout_ms)
 
         if not ret or frame is None:
-            raise RuntimeError(f"{self} read failed (status={ret}).")
+            raise RuntimeError(f"这里报错{self} read failed (status={ret}).")
 
         color_frame = frame.get_color_frame()
         color_image_raw = np.asanyarray(color_frame.get_data())
