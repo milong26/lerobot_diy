@@ -1,3 +1,7 @@
+# 直接运行，ctrl c退出
+# 需要提前calibrate，calibrate文件的xxx.json里面的xxx就对应robot的id
+
+
 from lerobot.common.cameras.opencv.configuration_opencv import OpenCVCameraConfig
 from lerobot.common.cameras.realsense.configuration_realsense import RealSenseCameraConfig
 from lerobot.common.teleoperators.so100_leader import SO100LeaderConfig, SO100Leader
