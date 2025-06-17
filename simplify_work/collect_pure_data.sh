@@ -1,0 +1,14 @@
+python -m lerobot.record \
+    --robot.type=so101_follower \
+    --robot.port=/dev/ttyACM0 \
+    --robot.id=congbi \
+    --robot.cameras="scene:{type: RealSense,serial_number_or_name:806312060427,width: 640, height: 480, fps: 30,use_depth:True} wrist:{type: opencv, index_or_path: 6,width: 640, height: 480, fps: 30}}" \
+    --teleop.type=so101_leader \
+    --teleop.port=/dev/ttyACM1 \
+    --teleop.id=zhubi \
+    --display_data=true \
+    --dataset.repo_id=616test/record-test \
+    --dataset.num_episodes=2 \
+    --dataset.single_task="grap a" \
+    --dataset.episode_time_s=30 \
+    --dataset.push_to_hub=False

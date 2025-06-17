@@ -309,7 +309,7 @@ class RealSenseCamera(Camera):
                 self.width, self.height = actual_width, actual_height
                 self.capture_width, self.capture_height = actual_width, actual_height
 
-    def read_depth(self, timeout_ms: int = 200) -> np.ndarray:
+    def read_depth(self, timeout_ms: int = 400) -> np.ndarray:
         """
         Reads a single frame (depth) synchronously from the camera.
 
