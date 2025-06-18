@@ -49,6 +49,7 @@ from lerobot.common.cameras import (  # noqa: F401
 )
 from lerobot.common.cameras.opencv.configuration_opencv import OpenCVCameraConfig  # noqa: F401
 from lerobot.common.cameras.realsense.configuration_realsense import RealSenseCameraConfig  # noqa: F401
+from lerobot.common.forcesensors.WowSkin.lerobot_wowconfig import WowForceSensorConfig
 from lerobot.common.datasets.image_writer import safe_stop_image_writer
 from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
 from lerobot.common.datasets.utils import build_dataset_frame, hw_to_dataset_features
@@ -224,6 +225,10 @@ def record_loop(
             for obs, val in observation.items():
                 if isinstance(val, float):
                     rr.log(f"observation.{obs}", rr.Scalar(val))
+                elif obs=="observation.force":
+                    # 能用，凑合一下，应该给force增加name的
+                    for i in val:
+                        rr.log(f"observation.{obs}", rr.Scalar(i))
                 elif isinstance(val, np.ndarray):
                     rr.log(f"observation.{obs}", rr.Image(val), static=True)
             for act, val in action.items():
@@ -248,6 +253,8 @@ def record(cfg: RecordConfig) -> LeRobotDataset:
 
     action_features = hw_to_dataset_features(robot.action_features, "action", cfg.dataset.video)
     obs_features = hw_to_dataset_features(robot.observation_features, "observation", cfg.dataset.video)
+
+
     dataset_features = {**action_features, **obs_features}
 
     if cfg.resume:
@@ -287,6 +294,7 @@ def record(cfg: RecordConfig) -> LeRobotDataset:
 
     for recorded_episodes in range(cfg.dataset.num_episodes):
         log_say(f"Recording episode {dataset.num_episodes}", cfg.play_sounds)
+        robot.gui0sensor()
         record_loop(
             robot=robot,
             events=events,
