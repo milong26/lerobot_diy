@@ -15,6 +15,7 @@
 from dataclasses import dataclass, field
 
 from lerobot.common.cameras import CameraConfig
+from lerobot.common.forcesensors.configs import ForceSensorConfig
 
 from ..config import RobotConfig
 
@@ -35,8 +36,12 @@ class SO100FollowerConfig(RobotConfig):
     # cameras
     cameras: dict[str, CameraConfig] = field(default_factory=dict)
 
+    # sensors
+    sensors: dict[str, ForceSensorConfig] = field(default_factory=dict)
+
     # Set to `True` for backward compatibility with previous policies/dataset
     use_degrees: bool = False
+    #
 
 
 @RobotConfig.register_subclass("so100_follower_end_effector")

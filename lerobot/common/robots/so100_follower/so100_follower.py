@@ -18,7 +18,8 @@ import logging
 import time
 from functools import cached_property
 from typing import Any
-
+from lerobot.common.forcesensors.utils import make_force_sensor_from_configs
+import torch
 from lerobot.common.cameras.realsense.camera_realsense import RealSenseCamera
 from lerobot.common.cameras.utils import make_cameras_from_configs
 from lerobot.common.errors import DeviceAlreadyConnectedError, DeviceNotConnectedError
@@ -60,6 +61,9 @@ class SO100Follower(Robot):
             calibration=self.calibration,
         )
         self.cameras = make_cameras_from_configs(config.cameras)
+        # make force sensor
+        if self.config.sensors:
+            self.force_sensors=make_force_sensor_from_configs(config.sensors)
 
     @property
     def _motors_ft(self) -> dict[str, type]:
@@ -91,8 +95,28 @@ class SO100Follower(Robot):
         return cam_ft
 
 
+    @property
+    def _sensors_ft(self) -> dict[str, tuple]:
+        sensor_ft={}
+        if self.config.sensors:
+
+
+            # for sensor_key, sensor in self.force_sensors.items():
+            #     sensor_ft[sensor_key] = (
+            #         self.config.cameras[cam_key].height,
+            #         self.config.cameras[cam_key].width,
+            #         3,
+            #     )
+            sensor_ft["observation.force"] = {
+                "dtype": "float64",
+                "shape": (15,),  # 15个点
+            }
+        return sensor_ft
+
     @cached_property
     def observation_features(self) -> dict[str, type | tuple]:
+        if self.config.sensors:
+            return {**self._motors_ft, **self._cameras_ft,**self._sensors_ft}
         return {**self._motors_ft, **self._cameras_ft}
 
     @cached_property
@@ -118,8 +142,22 @@ class SO100Follower(Robot):
         for cam in self.cameras.values():
             cam.connect()
 
+        # 启动sensor
+        if self.config.sensors:
+            for sensor in self.force_sensors.values():
+                sensor.connect()
+
         self.configure()
         logger.info(f"{self} connected.")
+
+    # sensor 归零，用在每次开始record之前
+    def gui0sensor(self):
+        print("sensor归零")
+        if self.config.sensors:
+            for sensor in self.force_sensors.values():
+                sensor.get_baseline()
+
+
 
     @property
     def is_calibrated(self) -> bool:
@@ -209,7 +247,12 @@ class SO100Follower(Robot):
             dt_ms = (time.perf_counter() - start) * 1e3
             logger.debug(f"{self} read {cam_key}: {dt_ms:.1f}ms")
 
-
+            # 获取force 
+        if self.config.sensors:
+            for sensor_key, sensor in self.force_sensors.items():
+                # 目前只有一个sensor就直接写吧
+                obs_dict["observation.force"] = sensor.get_data()
+                logger.debug(f"{self} read {sensor_key}")
         return obs_dict
 
     def send_action(self, action: dict[str, Any]) -> dict[str, Any]:
@@ -248,5 +291,10 @@ class SO100Follower(Robot):
         self.bus.disconnect(self.config.disable_torque_on_disconnect)
         for cam in self.cameras.values():
             cam.disconnect()
+
+        # 关闭sensor
+        if self.config.sensors:
+            for sensor in self.force_sensors.values():
+                sensor.disconnect()
 
         logger.info(f"{self} disconnected.")
