@@ -399,6 +399,7 @@ def hw_to_dataset_features(
     features = {}
     joint_fts = {key: ftype for key, ftype in hw_features.items() if ftype is float}
     cam_fts = {key: shape for key, shape in hw_features.items() if isinstance(shape, tuple)}
+    force_sensor_fts={key: ftype for key, ftype in hw_features.items() if key=="observation.force"}
 
     if joint_fts and prefix == "action":
         features[prefix] = {
@@ -412,6 +413,12 @@ def hw_to_dataset_features(
             "dtype": "float32",
             "shape": (len(joint_fts),),
             "names": list(joint_fts),
+        }
+    if prefix == "observation" and force_sensor_fts:
+        features[f"observation.force"]={
+            "dtype": "float64",
+            "shape": (15,),
+            "names": "observation.force"
         }
 
     for key, shape in cam_fts.items():
@@ -434,6 +441,8 @@ def build_dataset_frame(
             continue
         elif ft["dtype"] == "float32" and len(ft["shape"]) == 1:
             frame[key] = np.array([values[name] for name in ft["names"]], dtype=np.float32)
+        elif ft["dtype"]=="float64" and len(ft["shape"])==1:
+            frame[key] = values[ft["names"]]
         elif ft["dtype"] in ["image", "video"]:
             frame[key] = values[key.removeprefix(f"{prefix}.images.")]
 
