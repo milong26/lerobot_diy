@@ -30,8 +30,9 @@ teleop:
 display_data: true
 
 dataset:
-  repo_id: 617test/real-sense-no
-  num_episodes: 1
+  repo_id: 617test/test-camera
+  num_episodes: 50
   single_task: "grap a haha"
-  episode_time_s: 10
+  episode_time_s: 20
   push_to_hub: false
+  reset_time_s: 0
