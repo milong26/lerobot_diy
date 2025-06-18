@@ -19,6 +19,7 @@ import time
 from functools import cached_property
 from typing import Any
 
+from lerobot.common.cameras.realsense.camera_realsense import RealSenseCamera
 from lerobot.common.cameras.utils import make_cameras_from_configs
 from lerobot.common.errors import DeviceAlreadyConnectedError, DeviceNotConnectedError
 from lerobot.common.motors import Motor, MotorCalibration, MotorNormMode
@@ -64,11 +65,31 @@ class SO100Follower(Robot):
     def _motors_ft(self) -> dict[str, type]:
         return {f"{motor}.pos": float for motor in self.bus.motors}
 
+    # @property
+    # def _cameras_ft(self) -> dict[str, tuple]:
+    #     return {
+    #         cam: (self.config.cameras[cam].height, self.config.cameras[cam].width, 3) for cam in self.cameras
+    #     }
+
+
     @property
     def _cameras_ft(self) -> dict[str, tuple]:
-        return {
-            cam: (self.config.cameras[cam].height, self.config.cameras[cam].width, 3) for cam in self.cameras
-        }
+        cam_ft = {}
+        for cam_key, cam in self.cameras.items():
+            cam_ft[cam_key] = (
+                self.config.cameras[cam_key].height,
+                self.config.cameras[cam_key].width,
+                3,
+            )
+            if type(cam) is RealSenseCamera:
+                if cam.use_depth:
+                    cam_ft[f"{cam_key}_depth"] = (
+                        self.config.cameras[cam_key].height,
+                        self.config.cameras[cam_key].width,
+                        3,  # 假设深度图也有3通道（或你可以根据实际改为1）
+                    )
+        return cam_ft
+
 
     @cached_property
     def observation_features(self) -> dict[str, type | tuple]:
@@ -165,12 +186,29 @@ class SO100Follower(Robot):
         dt_ms = (time.perf_counter() - start) * 1e3
         logger.debug(f"{self} read state: {dt_ms:.1f}ms")
 
-        # Capture images from cameras
+        # # Capture images from cameras
+        # for cam_key, cam in self.cameras.items():
+        #     start = time.perf_counter()
+        #     obs_dict[cam_key] = cam.async_read()
+        #     dt_ms = (time.perf_counter() - start) * 1e3
+        #     logger.debug(f"{self} read {cam_key}: {dt_ms:.1f}ms")
+
+
+        # Capture images from cameras with depth
         for cam_key, cam in self.cameras.items():
             start = time.perf_counter()
-            obs_dict[cam_key] = cam.async_read()
+
+            if type(cam) is RealSenseCamera:
+                color, depth = cam.async_read_combined()
+                obs_dict[cam_key]=color
+                if depth is not None:
+                    obs_dict[cam_key+"_depth"]=depth
+            else:
+                obs_dict[cam_key] = cam.async_read()
+
             dt_ms = (time.perf_counter() - start) * 1e3
             logger.debug(f"{self} read {cam_key}: {dt_ms:.1f}ms")
+
 
         return obs_dict
 
