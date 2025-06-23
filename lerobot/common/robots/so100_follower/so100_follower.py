@@ -202,10 +202,10 @@ class SO100Follower(Robot):
             for motor in self.bus.motors:
                 self.bus.write("Operating_Mode", motor, OperatingMode.POSITION.value)
                 # Set P_Coefficient to lower value to avoid shakiness (Default is 32)
-                self.bus.write("P_Coefficient", motor, 16)
+                self.bus.write("P_Coefficient", motor, 12)
                 # Set I_Coefficient and D_Coefficient to default value 0 and 32
                 self.bus.write("I_Coefficient", motor, 0)
-                self.bus.write("D_Coefficient", motor, 32)
+                self.bus.write("D_Coefficient", motor, 0)
 
     def setup_motors(self) -> None:
         for motor in reversed(self.bus.motors):

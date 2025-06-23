@@ -1,0 +1,19 @@
+# python lerobot/scripts/train.py --config_path simplify_work/fine_tune_smolvla.yaml
+policy:
+  path: /home/qwe/wokonsmall/lerobot_diy/lerobot/smolvla_base
+  # device: cuda
+
+dataset:
+  repo_id: lerobot/svla_so101_pickplace
+  root: home/qwe/.cache/huggingface/lerobot/fcam1/third50
+
+batch_size: 64
+steps: 20000
+
+output_dir: outputs/train/my_smolvla
+job_name: my_smolvla_training
+
+wandb:
+  enable: true
+
+
