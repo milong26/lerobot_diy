@@ -173,4 +173,6 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+training_dataset/
+
 lerobot/smolvla_base
