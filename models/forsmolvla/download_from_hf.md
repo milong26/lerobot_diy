@@ -2,7 +2,7 @@
 
 
 smolvla_base
-
+git clone https://huggingface.co/lerobot/smolvla_base
 
 
 backbone:SmolVLM2-500M-Video-Instruct
