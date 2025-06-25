@@ -405,12 +405,14 @@ class SmolVLAPolicy(PreTrainedPolicy):
             for k in batch:
                 if k in self._queues:
                     batch[k] = torch.stack(list(self._queues[k]), dim=1)
+            # 推理的时候，如果有force
+            force = self.prepare_force(batch) if "force" in batch else None
             images, img_masks = self.prepare_images(batch)
             state = self.prepare_state(batch)
             lang_tokens, lang_masks = self.prepare_language(batch)
 
             actions = self.model.sample_actions(
-                images, img_masks, lang_tokens, lang_masks, state, noise=noise
+                images, img_masks, lang_tokens, lang_masks, state, noise=noise,force=force 
             )
             # Unpad actions
             original_action_dim = self.config.action_feature.shape[0]
@@ -433,13 +435,16 @@ class SmolVLAPolicy(PreTrainedPolicy):
             batch[ACTION] = self._pi_aloha_encode_actions_inv(batch[ACTION])
         batch = self.normalize_inputs(batch)
         batch = self.normalize_targets(batch)
+        # 增加force feature
+        force = self.prepare_force(batch) if "force" in batch else None  # 如果有force
         images, img_masks = self.prepare_images(batch)
         state = self.prepare_state(batch)
         lang_tokens, lang_masks = self.prepare_language(batch)
         actions = self.prepare_action(batch)
         actions_is_pad = batch.get("actions_id_pad")
         loss_dict = {}
-        losses = self.model.forward(images, img_masks, lang_tokens, lang_masks, state, actions, noise, time)
+        # force有的话就传入实际force，else传入None
+        losses = self.model.forward(images, img_masks, lang_tokens, lang_masks, state, actions, noise, time,force)
         loss_dict["losses_after_forward"] = losses.clone()
 
         if actions_is_pad is not None:
@@ -456,6 +461,26 @@ class SmolVLAPolicy(PreTrainedPolicy):
         # For backward pass
         loss_dict["loss"] = loss.item()
         return loss, loss_dict
+
+    # prepare force
+    def prepare_force(self, batch: dict[str, Tensor]) -> torch.Tensor:
+        """
+        Convert raw force input [bsize, 15, 1] to [bsize, 5, 3]
+        then compute z, dx , dy -> [bsize, 5, 3]
+        """
+        # 不确定， 验证一下传过来的对不对
+        force = batch["force"]  # shape: [bsize, 15, 1]
+        force = force.view(force.shape[0], 5, 3)  # [bsize, 5, 3]
+
+        x = force[:, :, 0:1]
+        y = force[:, :, 1:2]
+        z = force[:, :, 2:3]
+
+        dx = F.pad(x[:, 1:] - x[:, :-1], (0, 0, 0, 1))  # shape: [bsize, 5, 1]
+        dy = F.pad(y[:, 1:] - y[:, :-1], (0, 0, 0, 1))  # shape: [bsize, 5, 1]
+
+        force_feat = torch.cat([z, dx, dy], dim=-1)  # [bsize, 5, 3]
+        return force_feat
 
     def prepare_images(self, batch):
         """Apply SmolVLA preprocessing to the images, like resizing to 224x224 and padding to keep aspect ratio, and
@@ -638,6 +663,9 @@ class VLAFlowMatching(nn.Module):
         self.action_time_mlp_out = nn.Linear(
             self.vlm_with_expert.expert_hidden_size, self.vlm_with_expert.expert_hidden_size
         )
+        # 添加forc投影,shape:[batch,5,3]
+        self.force_proj = nn.Linear(3, self.vlm_with_expert.config.text_config.hidden_size)
+
 
         self.set_requires_grad()
         self.fake_image_token = self.vlm_with_expert.processor.tokenizer.fake_image_token_id
@@ -669,8 +697,9 @@ class VLAFlowMatching(nn.Module):
         time = time_beta * 0.999 + 0.001
         return time.to(dtype=torch.float32, device=device)
 
+    # 新增force feature
     def embed_prefix(
-        self, images, img_masks, lang_tokens, lang_masks, state: torch.Tensor = None
+        self, images, img_masks, lang_tokens, lang_masks, state: torch.Tensor = None, force: torch.Tensor = None
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Embed images with SigLIP and language tokens with embedding layer to prepare
         for SmolVLM transformer processing.
@@ -725,6 +754,17 @@ class VLAFlowMatching(nn.Module):
                 embs.append(image_end_token)
                 pad_masks.append(image_end_mask)
                 att_masks += [0] * (image_end_mask.shape[1])
+
+        # image之后，lang之前
+        # 可能不用force.如果没有force的话就什么也不做
+        if force is not None:
+            force_emb = self.force_proj(force)  # [bsize, 5, hidden_size]
+            force_mask = torch.ones(force_emb.shape[:2], dtype=torch.bool, device=force_emb.device)
+
+            embs.append(force_emb)
+            pad_masks.append(force_mask)
+            att_masks += [0] * force_emb.shape[1]
+
         lang_emb = self.vlm_with_expert.embed_language_tokens(lang_tokens)
         # Normalize language embeddings
         lang_emb_dim = lang_emb.shape[-1]
@@ -807,7 +847,7 @@ class VLAFlowMatching(nn.Module):
         return embs, pad_masks, att_masks
 
     def forward(
-        self, images, img_masks, lang_tokens, lang_masks, state, actions, noise=None, time=None
+        self, images, img_masks, lang_tokens, lang_masks, state, actions, noise=None, time=None,force=None
     ) -> Tensor:
         """Do a full training forward pass and compute the loss (batch_size x num_steps x num_motors)"""
         if noise is None:
@@ -820,7 +860,7 @@ class VLAFlowMatching(nn.Module):
         x_t = time_expanded * noise + (1 - time_expanded) * actions
         u_t = noise - actions
         prefix_embs, prefix_pad_masks, prefix_att_masks = self.embed_prefix(
-            images, img_masks, lang_tokens, lang_masks, state=state
+            images, img_masks, lang_tokens, lang_masks, state=state,force=force
         )
         suffix_embs, suffix_pad_masks, suffix_att_masks = self.embed_suffix(x_t, time)
 
@@ -844,7 +884,7 @@ class VLAFlowMatching(nn.Module):
         losses = F.mse_loss(u_t, v_t, reduction="none")
         return losses
 
-    def sample_actions(self, images, img_masks, lang_tokens, lang_masks, state, noise=None) -> Tensor:
+    def sample_actions(self, images, img_masks, lang_tokens, lang_masks, state, noise=None,force=None) -> Tensor:
         """Do a full inference forward and compute the action (batch_size x num_steps x num_motors)"""
         bsize = state.shape[0]
         device = state.device
@@ -854,7 +894,7 @@ class VLAFlowMatching(nn.Module):
             noise = self.sample_noise(actions_shape, device)
 
         prefix_embs, prefix_pad_masks, prefix_att_masks = self.embed_prefix(
-            images, img_masks, lang_tokens, lang_masks, state=state
+            images, img_masks, lang_tokens, lang_masks, state=state,force=force
         )
         prefix_att_2d_masks = make_att_2d_masks(prefix_pad_masks, prefix_att_masks)
         prefix_position_ids = torch.cumsum(prefix_pad_masks, dim=1) - 1
