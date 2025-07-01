@@ -82,7 +82,9 @@ class SmolVLAConfig(PreTrainedConfig):
     scheduler_decay_steps: int = 30_000
     scheduler_decay_lr: float = 2.5e-6
 
-    vlm_model_name: str = "HuggingFaceTB/SmolVLM2-500M-Video-Instruct"  # Select the VLM backbone.
+    # vlm_model_name: str = "HuggingFaceTB/SmolVLM2-500M-Video-Instruct"  # Select the VLM backbone.
+    # 直接把这个vlm_model_name改成local
+    vlm_model_name:str="models/forsmolvla/HuggingFaceTB/SmolVLM2-500M-Video-Instruct"
 
     # 不方便直接下载所以改成path
     # 目录在lerobot同级

@@ -62,7 +62,8 @@ def get_intermediate_size(hidden_dim, ffn_dim_multiplier=4, multiple_of=256):
 class SmolVLMWithExpertModel(nn.Module):
     def __init__(
         self,
-        model_id: str = "HuggingFaceTB/SmolVLM2-500M-Video-Instruct",
+        # model_id: str = "HuggingFaceTB/SmolVLM2-500M-Video-Instruct",
+        model_id:str="models/forsmolvla/HuggingFaceTB/SmolVLM2-500M-Video-Instruct",
         load_vlm_weights: bool = True,
         train_expert_only: bool = True,
         freeze_vision_encoder: bool = False,
