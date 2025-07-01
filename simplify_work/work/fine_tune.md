@@ -1,5 +1,7 @@
-python lerobot/scripts/train.py \  
---policy.path=/home/qwe/wokonsmall/lerobot_diy/lerobot/smolvla_base \
+# 在lerobot目录下
+
+HF_ENDPOINT=https://hf-mirror.com 
+TRANSFORMERS_OFFLINE=1 HF_DATASETS_OFFLINE=1 python lerobot/scripts/train.py --policy.path=models/forsmolvla/smolvla_base \
 --dataset.repo_id=lerobot/svla_so101_pickplace \
 --batch_size=64  \
 --steps=20000  \
@@ -7,4 +9,4 @@ python lerobot/scripts/train.py \
 --job_name=my_smolvla_training \
 --policy.device=cuda  \
 --wandb.enable=false \
---dataset.root=/home/qwe/.cache/huggingface/lerobot/622work/1
+--dataset.root=training_dataset/622work/1

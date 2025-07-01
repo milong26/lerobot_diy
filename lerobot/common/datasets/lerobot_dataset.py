@@ -93,6 +93,7 @@ class LeRobotDatasetMetadata:
                 raise FileNotFoundError
             self.load_metadata()
         except (FileNotFoundError, NotADirectoryError):
+            raise FileNotFoundError("trainingdata没识别到")
             if is_valid_version(self.revision):
                 self.revision = get_safe_version(self.repo_id, self.revision)
 
@@ -476,6 +477,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
             assert all((self.root / fpath).is_file() for fpath in self.get_episodes_file_paths())
             self.hf_dataset = self.load_hf_dataset()
         except (AssertionError, FileNotFoundError, NotADirectoryError):
+            raise FileNotFoundError("dara没找到")
             self.revision = get_safe_version(self.repo_id, self.revision)
             self.download_episodes(download_videos)
             self.hf_dataset = self.load_hf_dataset()
