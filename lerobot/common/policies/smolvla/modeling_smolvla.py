@@ -353,7 +353,8 @@ class SmolVLAPolicy(PreTrainedPolicy):
             config.output_features, config.normalization_mapping, dataset_stats
         )
 
-        self.language_tokenizer = AutoProcessor.from_pretrained(self.config.vlm_model_name).tokenizer
+        # self.language_tokenizer = AutoProcessor.from_pretrained(self.config.vlm_model_name).tokenizer
+        self.language_tokenizer = AutoProcessor.from_pretrained("models/forsmolvla/"+self.config.vlm_model_name, local_files_only=True).tokenizer
         self.model = VLAFlowMatching(config)
         self.reset()
 
