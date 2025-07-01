@@ -1,7 +1,7 @@
 # 在lerobot目录下
 
 HF_ENDPOINT=https://hf-mirror.com 
-TRANSFORMERS_OFFLINE=1 HF_DATASETS_OFFLINE=1 python lerobot/scripts/train.py --policy.path=models/forsmolvla/smolvla_base \
+HF_HUB_OFFLINE=1 python lerobot/scripts/train.py --policy.path=models/forsmolvla/smolvla_base \
 --dataset.repo_id=lerobot/svla_so101_pickplace \
 --batch_size=64  \
 --steps=20000  \
