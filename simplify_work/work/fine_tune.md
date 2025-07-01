@@ -8,5 +8,6 @@ TRANSFORMERS_OFFLINE=1 HF_DATASETS_OFFLINE=1 python lerobot/scripts/train.py --p
 --output_dir=outputs/train/my_smolvla  \
 --job_name=my_smolvla_training \
 --policy.device=cuda  \
+--policy.repo_id=lerobot/smolvla_base \
 --wandb.enable=false \
 --dataset.root=training_dataset/622work/1
