@@ -52,6 +52,9 @@ from lerobot.configs import parser
 from lerobot.configs.train import TrainPipelineConfig
 from lerobot.scripts.eval import eval_policy
 
+# https://github.com/huggingface/lerobot/issues/1377
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 def update_policy(
     train_metrics: MetricsTracker,

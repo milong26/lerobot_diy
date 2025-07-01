@@ -354,7 +354,9 @@ class SmolVLAPolicy(PreTrainedPolicy):
         )
 
         # self.language_tokenizer = AutoProcessor.from_pretrained(self.config.vlm_model_name).tokenizer
-        self.language_tokenizer = AutoProcessor.from_pretrained("models/forsmolvla/"+self.config.vlm_model_name, local_files_only=True).tokenizer
+
+        self.language_tokenizer = AutoProcessor.from_pretrained(self.config.vlm_model_name, local_files_only=True).tokenizer
+        # 这里应该能正常，但是config又不对
         self.model = VLAFlowMatching(config)
         self.reset()
 
