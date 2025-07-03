@@ -22,7 +22,8 @@ from image_sender import start_image_sender, image_queue, stop_image_sender
 from queue import Queue
 
 server_ip = '10.10.1.35'
-port = 9000
+image_port = 9000
+text_port =9001
 
 # 创建共享的非图像请求队列和响应队列
 request_queue = Queue()
@@ -31,7 +32,7 @@ response_queue = Queue()
 def start_non_image_thread():
     def send_non_image_data():
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((server_ip, port))
+        sock.connect((server_ip, text_port))
         print("[DataSender] Connected to server for non-image data")
 
         while True:
@@ -56,7 +57,7 @@ def start_non_image_thread():
     threading.Thread(target=send_non_image_data, daemon=True).start()
 
 # 启动图像线程
-start_image_sender(host=server_ip, port=port)
+start_image_sender(host=server_ip, port=image_port)
 # 启动非图像线程
 start_non_image_thread()
 
