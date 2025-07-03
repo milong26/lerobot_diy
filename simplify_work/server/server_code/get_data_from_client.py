@@ -5,7 +5,7 @@ import time
 
 if __name__ == '__main__':
     start_image_server(port=9000)  # 图像与非图像共用端口
-    start_data_server(port=9000)
+    start_data_server(port=9001)
 
     print("[Main] Server running. Press Ctrl+C to stop.")
     try:
