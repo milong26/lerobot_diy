@@ -407,13 +407,14 @@ def hw_to_dataset_features(
             "shape": (len(joint_fts),),
             "names": list(joint_fts),
         }
-
+    # 图像feature
     if joint_fts and prefix == "observation":
         features[f"{prefix}.state"] = {
             "dtype": "float32",
             "shape": (len(joint_fts),),
             "names": list(joint_fts),
         }
+    # 增加一个force feature，目前是15维
     if prefix == "observation" and force_sensor_fts:
         features[f"observation.force"]={
             "dtype": "float64",

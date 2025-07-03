@@ -107,6 +107,8 @@ def update_policy(
     train_metrics.update_s = time.perf_counter() - start_time
     return train_metrics, output_dict
 
+def modify_language(batch):
+    return batch
 # 增加过滤feature
 def filter_batch_features(batch, cfg):
     filtered = {}
@@ -119,6 +121,9 @@ def filter_batch_features(batch, cfg):
     for key, value in batch.items():
         if key not in exclude_features:
             filtered[key] = value
+    # 添加language instruction，此时一定有observation.scene和observation.scene_depth
+    if not cfg.use_language_tip:
+        filtered["task"]=modify_language(batch)
     return filtered
 
 

@@ -23,6 +23,9 @@ from contextlib import nullcontext
 from copy import copy
 from functools import cache
 
+# 服务器推理
+from simplify_work.server.local_code.predict_from_server_api import predict_from_server
+
 import numpy as np
 import torch
 from deepdiff import DeepDiff
@@ -118,13 +121,24 @@ def predict_action(
                 observation[name] = observation[name].permute(2, 0, 1).contiguous()
             observation[name] = observation[name].unsqueeze(0)
             observation[name] = observation[name].to(device)
+            # 把force变成dtype32的，没必要保留64
+            if "force" in name:
+                observation[name] = observation[name].to(dtype=torch.float32)
 
         observation["task"] = task if task else ""
         observation["robot_type"] = robot_type if robot_type else ""
 
         # Compute the next action with the policy
         # based on the current observation
-        action = policy.select_action(observation)
+
+
+        """
+        使用服务器推理。给服务器传observation，接收服务器的action
+        """
+        action=predict_from_server(policy,observation)
+
+        # 原来本地调用polciy
+        # action = policy.select_action(observation)
 
         # Remove batch dimension
         action = action.squeeze(0)
