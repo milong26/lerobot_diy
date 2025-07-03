@@ -42,4 +42,14 @@ def handle_image_connection(conn):
     conn.close()
 
 def start_image_server(host='0.0.0.0', port=9000):
-    threading.Thread(target=_star_
+    threading.Thread(target=_start_server_thread, args=(host, port), daemon=True).start()
+
+def _start_server_thread(host, port):
+    server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_sock.bind((host, port))
+    server_sock.listen(1)
+    print(f"[ImageReceiver] Listening on {host}:{port}")
+
+    conn, addr = server_sock.accept()
+    print(f"[ImageReceiver] Connected by {addr}")
+    handle_image_connection(conn)
