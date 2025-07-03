@@ -227,9 +227,9 @@ def record_loop(
                 if isinstance(val, float):
                     rr.log(f"observation.{obs}", rr.Scalar(val))
                 elif obs=="observation.force":
-                    # 能用，凑合一下，应该给force增加name的
-                    for i in val:
-                        rr.log(f"observation.{obs}_{val.index(i)}", rr.Scalar(i))
+                    # 跳过一下
+                    pass
+
                 elif isinstance(val, np.ndarray):
                     rr.log(f"observation.{obs}", rr.Image(val), static=True)
             for act, val in action.items():

@@ -63,6 +63,11 @@ class TrainPipelineConfig(HubMixin):
     scheduler: LRSchedulerConfig | None = None
     eval: EvalConfig = field(default_factory=EvalConfig)
     wandb: WandBConfig = field(default_factory=WandBConfig)
+    """
+    为了在多模态里面选择用/不用depth_image，默认为true。scripts/train.py
+    """
+    use_depth_image: bool=False
+    use_force: bool=False
 
     def __post_init__(self):
         self.checkpoint_path = None
