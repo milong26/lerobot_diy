@@ -24,7 +24,7 @@ from copy import copy
 from functools import cache
 
 # 服务器推理
-from simplify_work.server.local_code.predict_from_server_api import predict_from_server
+# from simplify_work.server.local_code.predict_from_server_api import predict_from_server
 
 import numpy as np
 import torch
@@ -135,10 +135,10 @@ def predict_action(
         """
         使用服务器推理。给服务器传observation，接收服务器的action
         """
-        action=predict_from_server(policy,observation)
+        # action=predict_from_server(policy,observation)
 
         # 原来本地调用polciy
-        # action = policy.select_action(observation)
+        action = policy.select_action(observation)
 
         # Remove batch dimension
         action = action.squeeze(0)
