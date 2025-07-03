@@ -177,4 +177,3 @@ cython_debug/
 # 模型和数据
 training_dataset/
 models/
-.vscode

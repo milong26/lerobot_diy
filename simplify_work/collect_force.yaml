@@ -1,9 +1,12 @@
 
-# python -m lerobot.record --config_path simplify_work/collect_pure_data.yaml
-
+# python -m lerobot.record --config_path simplify_work/collect_force\.yaml
+# sudo chmod 666 /dev/ttyACM0 
+# sudo chmod 666 /dev/ttyACM1 
+#  sudo chmod 666 /dev/ttyACM2
+# 如果要继续 --record.resume=True
 robot:
   type: so100_follower
-  port: /dev/ttyACM0
+  port: /dev/ttyACM1
   id: congbi
   cameras:
     scene:
@@ -15,20 +18,20 @@ robot:
       use_depth: true
     wrist:
       type: opencv
-      index_or_path: 0
+      index_or_path: 6
       width: 640
       height: 480
       fps: 30
   sensors:
     wrist:
       type: WowForceSensor
-      port: /dev/ttyACM2
+      port: /dev/ttyACM0
       num_mags: 5
   
 
 teleop:
   type: so100_leader
-  port: /dev/ttyACM1
+  port: /dev/ttyACM2
   id: zhubi
 
 
@@ -36,8 +39,8 @@ teleop:
 display_data: true
 
 dataset:
-  repo_id: 617test/test-force
-  num_episodes: 20
-  single_task: "grap a haha"
-  episode_time_s: 30
+  repo_id: 701data/first50
+  num_episodes: 50
+  single_task: "grap a red bottle and put it into white circle"
+  episode_time_s: 15
   push_to_hub: false

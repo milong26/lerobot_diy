@@ -107,6 +107,22 @@ def update_policy(
     train_metrics.update_s = time.perf_counter() - start_time
     return train_metrics, output_dict
 
+# 增加过滤feature
+def filter_batch_features(batch, cfg):
+    filtered = {}
+    exclude_features = []
+    if not cfg.use_depth_image:
+        # 只有一个scene有，先凑合用
+        exclude_features.append("observation.scene.depth_image")
+    if not cfg.use_force:
+        exclude_features.append("observation.force")
+    for key, value in batch.items():
+        if key not in exclude_features:
+            filtered[key] = value
+    return filtered
+
+
+
 
 @parser.wrap()
 def train(cfg: TrainPipelineConfig):
@@ -211,6 +227,11 @@ def train(cfg: TrainPipelineConfig):
         for key in batch:
             if isinstance(batch[key], torch.Tensor):
                 batch[key] = batch[key].to(device, non_blocking=True)
+
+        """
+        过滤不需要的feature
+        """
+        batch = filter_batch_features(batch, cfg)
 
         train_tracker, output_dict = update_policy(
             train_tracker,

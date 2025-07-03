@@ -1,4 +1,7 @@
-
+# conda activate lerobot
+# 检查端口： python lerobot/find_port.py
+# sudo chmod 666 /dev/ttyACM0
+# python lerobot/replay.py --config_path=simplify_work/replay_old_dataset.yaml 
 robot:
   type: so100_follower
   port: /dev/ttyACM0
@@ -7,5 +10,5 @@ robot:
 # repo_id，随便选一个能用的，实际用的还是本地数据
 dataset:
   repo_id: lerobot/svla_so100_sorting
-  root: ~/.cache/huggingface/lerobot/fcam1/third50
-  episode: 0
+  root: /home/qwe/.cache/huggingface/lerobot/other_so101/record-test
+  episode: 1

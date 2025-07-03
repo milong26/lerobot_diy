@@ -20,14 +20,14 @@ camera_config = {
 
 # follower
 robot_config = SO100FollowerConfig(
-    port="/dev/ttyACM0",
+    port="/dev/ttyACM1",
     id="congbi",
     cameras=camera_config
 )
 
 # leader
 teleop_config = SO100LeaderConfig(
-    port="/dev/ttyACM1",
+    port="/dev/ttyACM2",
     id="zhubi",
 )
 

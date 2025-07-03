@@ -88,8 +88,6 @@ class SmolVLAConfig(PreTrainedConfig):
 
     # 不方便直接下载所以改成path
     # 目录在lerobot同级
-    # /data/zly/junwork/lerobot_diy/models/forsmolvla/HuggingFaceTB/SmolVLM2-500M-Video-Instruct
-    # vlm_model_name:str="models/forsmolvla/HuggingFaceTB/SmolVLM2-500M-Video-Instruct"
     load_vlm_weights: bool = False  # Set to True in case of training the expert from scratch. True when init from pretrained SmolVLA weights
 
     add_image_special_tokens: bool = False  # Whether to use special image tokens around image features.

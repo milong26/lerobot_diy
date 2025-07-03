@@ -11,3 +11,4 @@ HF_HUB_OFFLINE=1 python lerobot/scripts/train.py --policy.path=models/forsmolvla
 --policy.repo_id=lerobot/smolvla_base \
 --wandb.enable=false \
 --dataset.root=training_dataset/622work/1
+--use_depth_image=True
