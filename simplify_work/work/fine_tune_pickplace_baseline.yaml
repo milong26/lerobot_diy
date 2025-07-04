@@ -1,0 +1,20 @@
+# CUDA_VISIBLE_DEVICES=3 HF_HUB_OFFLINE=1 python lerobot/scripts/train.py --config_path=simplify_work/work/fine_tune_picplace_baseline.yaml
+# 纯净版，depth、force、language都没有的，batch_size也小一点看看要多久
+policy:
+  path: models/forsmolvla/smolvla_base
+
+dataset:
+  repo_id: lerobot/svla_so101_pickplace
+  root: training_dataset/0703work/pickplace
+
+batch_size: 16
+steps: 20000
+output_dir: outputs/train/pickplace_baseline
+job_name: my_smolvla_training_pickplace_baseline
+wandb:
+  enable: false
+
+policy:
+  device: cuda
+  repo_id: lerobot/smolvla_base
+  type: smolvla

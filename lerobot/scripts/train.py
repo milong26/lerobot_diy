@@ -54,7 +54,8 @@ from lerobot.scripts.eval import eval_policy
 
 # https://github.com/huggingface/lerobot/issues/1377
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 def update_policy(
     train_metrics: MetricsTracker,
@@ -115,15 +116,18 @@ def filter_batch_features(batch, cfg):
     exclude_features = []
     if not cfg.use_depth_image:
         # 只有一个scene有，先凑合用
-        exclude_features.append("observation.scene.depth_image")
+        exclude_features.append("observation.images.side_depth")
+        exclude_features.append("observation.images.side_depth_is_pad")
     if not cfg.use_force:
         exclude_features.append("observation.force")
+        exclude_features.append("observation.force_is_pad")
+
     for key, value in batch.items():
         if key not in exclude_features:
             filtered[key] = value
     # 添加language instruction，此时一定有observation.scene和observation.scene_depth
-    if not cfg.use_language_tip:
-        filtered["task"]=modify_language(batch)
+    # if  cfg.use_language_tip:
+    #     filtered["task"]=modify_language(batch)
     return filtered
 
 
@@ -237,6 +241,8 @@ def train(cfg: TrainPipelineConfig):
         过滤不需要的feature
         """
         batch = filter_batch_features(batch, cfg)
+        # print("训练的时候有:",batch.keys())
+
 
         train_tracker, output_dict = update_policy(
             train_tracker,
