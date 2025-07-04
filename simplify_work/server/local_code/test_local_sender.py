@@ -1,27 +1,23 @@
 import torch
-import time
-from predict_from_server_api import predict_from_server,shutdown_clients
+import asyncio
+from predict_from_server_async import predict_from_server
+from image_sender_async import start_image_sender_async, stop_image_sender_async
 
-# 构造 observation
-observation = {
-    'observation.state': torch.rand(1, 6),
-    'observation.force': torch.rand(1, 15),
-    'observation.images.scene': torch.rand(3, 480, 640),
-    'observation.images.scene_depth': torch.rand(3, 480, 640),
-    'observation.images.wrist': torch.rand(3, 480, 640),
-    'task': 'pick apple',
-    'robot_type': 'so100',
-}
+async def main():
+    observation = {
+        'observation.state': torch.rand(1, 6),
+        'observation.force': torch.rand(1, 15),
+        'observation.images.scene': torch.rand(3, 480, 640),
+        'observation.images.scene_depth': torch.rand(3, 480, 640),
+        'observation.images.wrist': torch.rand(3, 480, 640),
+        'task': 'pick apple',
+        'robot_type': 'so100',
+    }
 
-start_time = time.time()
+    start_image_sender_async('10.10.1.35', 9100)
+    result = await predict_from_server(observation)
+    stop_image_sender_async()
+    print("Result:", result)
 
-# 预测调用
-result = predict_from_server(observation)
-
-# 程序退出前调用
-shutdown_clients()
-
-end_time = time.time()
-
-print("Prediction result:", result)
-print(f"Total round-trip time: {(end_time - start_time)*1000:.2f} ms")
+if __name__ == '__main__':
+    asyncio.run(main())
