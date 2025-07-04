@@ -4,9 +4,8 @@ from handler import start_data_server
 import time
 
 if __name__ == '__main__':
-    host='10.10.1.35'
-    start_image_server(host=host,port=9100)  # 图像与非图像共用端口
-    start_data_server(host=host,port=9101)
+    start_image_server(port=9000)  # 图像与非图像共用端口
+    start_data_server(port=9001)
 
     print("[Main] Server running. Press Ctrl+C to stop.")
     try:
