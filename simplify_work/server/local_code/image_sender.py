@@ -1,7 +1,7 @@
 import asyncio
 import numpy as np
 import struct
-from shared_state import image_queue, stop_event
+from ..shared_state import image_queue, stop_event
 
 async def image_sender(host, port):
     reader, writer = await asyncio.open_connection(host, port)

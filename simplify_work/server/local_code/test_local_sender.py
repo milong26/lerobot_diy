@@ -1,7 +1,7 @@
 import torch
 import asyncio
-from predict_from_server_async import predict_from_server
-from image_sender_async import start_image_sender_async, stop_image_sender_async
+from predict_from_server_api import predict_from_server
+from image_sender import start_image_sender_async, stop_image_sender_async
 
 async def main():
     observation = {

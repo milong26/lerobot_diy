@@ -16,7 +16,7 @@ import asyncio
 import json
 import torch
 import numpy as np
-from shared_state import image_queue
+from ..shared_state import image_queue
 
 server_ip = '10.10.1.35'
 image_port = 9100
