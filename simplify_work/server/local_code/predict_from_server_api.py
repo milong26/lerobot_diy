@@ -22,8 +22,8 @@ from image_sender import start_image_sender, image_queue, stop_image_sender
 from queue import Queue
 
 server_ip = '10.10.1.35'
-image_port = 9000
-text_port =9001
+image_port = 9100
+text_port =9101
 
 # 创建共享的非图像请求队列和响应队列
 request_queue = Queue()
