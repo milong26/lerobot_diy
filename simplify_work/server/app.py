@@ -119,7 +119,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Dict, List
 import uvicorn
-from model_loader import get_model
+from lerobot_diy.simplify_work.server.server_code.model_loader import get_model
 
 app = FastAPI()
 
