@@ -5,8 +5,8 @@ policy暂时传不过来，以后再搞，最好是能把path和type传过来
 
 {'observation.state': tensor([[ ]]),
  'observation.force': tensor([[]]), 
-'observation.images.scene': tensor([[[[]]]]),
-'observation.images.scene_depth': tensor([[[[]]]]), 
+'observation.images.side': tensor([[[[]]]]),
+'observation.images.side_depth': tensor([[[[]]]]), 
 'observation.images.wrist': tensor([[[[]]]]),
  'task': '', 
  'robot_type': ''
@@ -64,8 +64,8 @@ start_non_image_thread()
 
 def predict_from_server(observation):
     # 抽取图像数据并发送
-    for cam_key in ['observation.images.scene', 
-                    'observation.images.scene_depth', 
+    for cam_key in ['observation.images.side', 
+                    # 'observation.images.side_depth', 
                     'observation.images.wrist']:
         img_tensor = observation.pop(cam_key)
         img_array = img_tensor.squeeze().cpu().numpy()

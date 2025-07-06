@@ -2,6 +2,7 @@
 import socket
 import threading
 import json
+from lerobot_diy.simplify_work.server.server_code.model_loader import load_policy
 import torch
 import numpy as np
 from image_receiver import image_buffer, lock
@@ -40,12 +41,16 @@ def handle_data_connection(conn):
                     observation[key] = val
 
             # 等待图像数据到齐
-            images = wait_for_images(['scene', 'scene_depth', 'wrist'], timeout=2.0)
+            images = wait_for_images(['scene',
+                                    #   'scene_depth', 
+                                      'wrist'], timeout=2.0)
             if images is None:
                 print("[DataReceiver] Warning: Missing some images after waiting.")
                 # 你可以决定继续执行或返回默认图像
                 # 例如填充默认图像：
-                for cam in ['scene', 'scene_depth', 'wrist']:
+                for cam in ['scene',
+                            #  'scene_depth',
+                               'wrist']:
                     key = f'observation.images.{cam}'
                     observation[key] = torch.zeros(3, 480, 640)  # 根据你实际图像尺寸设置
             else:
@@ -54,7 +59,10 @@ def handle_data_connection(conn):
                     key = f'observation.images.{cam}'
                     observation[key] = torch.tensor(np_img, dtype=torch.float32)
 
-            # 调用模型
+            # 调用模型 需要执行action = policy.select_action(observation) 
+            # policy?
+            policy=load_policy()
+            action = policy.select_action(observation) 
             action = dummy_policy(observation)
             conn.sendall(json.dumps(action).encode('utf-8'))
 
