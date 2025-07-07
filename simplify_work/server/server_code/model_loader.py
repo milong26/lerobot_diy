@@ -24,10 +24,7 @@ import time
 
 from lerobot.common.policies.smolvla.configuration_smolvla import SmolVLAConfig
 from lerobot.common.policies.smolvla.modeling_smolvla import SmolVLAPolicy
-from lerobot.common.policies.normalize import Normalize, Unnormalize
-from lerobot.common.policies.pretrained import PreTrainedPolicy
-from lerobot.configs.policies import PreTrainedConfig
-from lerobot.configs.types import FeatureType, NormalizationMode, PolicyFeature
+from lerobot.configs.types import FeatureType, PolicyFeature
 
 
 
@@ -59,7 +56,7 @@ def load_policy():
         input_features=input_features,
         output_features=output_features,
         device="cuda",
-        pretrained_path = Path("outputs/train/pickplace_baseline/checkpoints/last/pretrained_model")
+        # pretrained_path = Path("outputs/train/pickplace_baseline/checkpoints/last/pretrained_model")
     )
 
 
@@ -75,14 +72,14 @@ def load_policy():
 
     # 加载权重
     policy = SmolVLAPolicy._load_as_safetensor(instance, model_file, config.device, strict)
-    policy.to(config.device)
+    
     policy.eval()
+    # policy.to(config.device)
+    policy = policy.to("cuda")
 
-    # config = SmolVLAConfig(pretrainedconfig)
-    # model = ACT(config)
-    for name, param in policy.named_parameters():
-        print(name, torch.sum(param).item())
-        break  # 打印第一个就行，足够检测差异
+    # for name, param in policy.named_parameters():
+    #     print(name, torch.sum(param).item())
+    #     break  # 打印第一个就行，足够检测差异
+    
     return policy
 
-load_policy()
