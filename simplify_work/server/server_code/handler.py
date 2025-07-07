@@ -3,6 +3,7 @@ from copy import copy
 import socket
 import threading
 import json
+from model_loader import load_policy
 import torch
 import numpy as np
 from image_receiver import image_buffer, lock

@@ -1,2 +1,2 @@
-import simplify_work
-import lerobot
+from . import simplify_work
+from . import lerobot
