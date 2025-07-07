@@ -4,7 +4,7 @@
 # python -m lerobot.record --config_path=simplify_work/work/evaluate_smolvla_base.yaml
 
 policy:
-  path: home/qwe/.cache/huggingface/lerobot/trained_models_for_test/pretrained_model
+  path: home/qwe/.cache/huggingface/lerobot/trained_baseline_locally/77download/pretrained/pretrained_model
 robot:
   type: so100_follower
   port: /dev/ttyACM0

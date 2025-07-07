@@ -76,6 +76,23 @@ from lerobot.common.policies.utils import (
 )
 from lerobot.common.utils.utils import get_safe_dtype
 
+
+# 服务器推理
+import os
+import sys
+
+# 获取该文件所在目录（control_utils.py）
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 找到 simplify_work/server/local_code 所在目录的绝对路径
+predict_code_dir = os.path.abspath(os.path.join(current_dir, '../../../../simplify_work/server/local_code'))
+
+# 临时加入 Python 模块搜索路径
+if predict_code_dir not in sys.path:
+    sys.path.insert(0, predict_code_dir)
+
+from predict_from_server_api import predict_from_server
+
 # Matches ".soNNN", optionally followed by "-something", up to the "_buffer_" marker
 _VARIANT_RE = re.compile(r"\.so\d+(?:-[\w]+)?_buffer_")
 
@@ -391,6 +408,16 @@ class SmolVLAPolicy(PreTrainedPolicy):
             if k in self._queues:
                 batch[k] = torch.stack(list(self._queues[k]), dim=1)
 
+        """
+        下面这四行在服务器运行。输入batch，返回actions
+        images, img_masks = self.prepare_images(batch)
+        state = self.prepare_state(batch)
+        lang_tokens, lang_masks = self.prepare_language(batch)
+
+        actions = self.model.sample_actions(images, img_masks, lang_tokens, lang_masks, state, noise=noise)
+        """
+        # actions=predict_from_server(batch)
+
         images, img_masks = self.prepare_images(batch)
         state = self.prepare_state(batch)
         lang_tokens, lang_masks = self.prepare_language(batch)
@@ -440,6 +467,9 @@ class SmolVLAPolicy(PreTrainedPolicy):
         # Action queue logic for n_action_steps > 1. When the action_queue is depleted, populate it by
         # querying the policy.
         if len(self._queues[ACTION]) == 0:
+            """
+            这里传入的是observation(batch)，应该调用远程服务器
+            """
             actions = self._get_action_chunk(batch, noise)
 
             # `self.predict_action_chunk` returns a (batch_size, n_action_steps, action_dim) tensor, but the queue

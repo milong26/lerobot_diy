@@ -58,7 +58,8 @@ def handle_data_connection(conn, model):
                 if isinstance(val, list):
                     val = np.array(val, dtype=np.float32).squeeze()
                 observation[key] = val
-            model.reset()
+            # 每个episode才reset一次，但是reset只是跟queue有关
+            # model.reset() 
             images = wait_for_images(['side', 'wrist'], timeout=2.0)
             if images is None:
                 raise KeyError("图片没传送过来")
@@ -75,34 +76,21 @@ def handle_data_connection(conn, model):
                 # batch["observation.images.sideDepth"],
             ]
             # 需要确保这里的observation格式一致
-            print("=== 字典内容检查2 ===")
-            for key, value in observation.items():
-                dtype = type(value).__name__
-
-                # 尝试获取 shape 或长度
-                shape_or_len = None
-                if hasattr(value, 'shape'):
-                    shape_or_len = f"shape: {value.shape}"
-                elif isinstance(value, (list, tuple, dict, str)):
-                    shape_or_len = f"len: {len(value)}"
-
-                print(f"- Key: {key}")
-                print(f"  类型: {dtype}")
-                if shape_or_len:
-                    print(f"  大小: {shape_or_len}")
-                else:
-                    print("  大小: 不适用")
-                print()
             batch=preprocess_observation_server(observation=observation)
-            print(batch)
             # 整理 batch 格式供模型推理
+            # 参考_get_action_chunk函数
+            images, img_masks = model.prepare_images(batch)
+            state = model.prepare_state(batch)
+            lang_tokens, lang_masks = model.prepare_language(batch)
+            # 看了下好像没有noise？
+            noise=None
 
-            action = model.select_action(batch)
+            actions = model.model.sample_actions(images, img_masks, lang_tokens, lang_masks, state, noise=noise)
             print("推理后",time.time())
-            print(action)
+            print(actions)
 
             # 返回结果
-            conn.sendall(json.dumps({"action": action.tolist()}).encode('utf-8'))
+            conn.sendall(json.dumps({"action": actions.tolist()}).encode('utf-8'))
 
         except Exception as e:
             print(f"[DataReceiver] Error: {e}")
@@ -115,15 +103,6 @@ def start_data_server(host='0.0.0.0', port=9001, model=None):
     threading.Thread(target=_start_data_thread, args=(host, port, model), daemon=True).start()
 
 
-# def _start_data_thread(host, port, model):
-#     server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#     server_sock.bind((host, port))
-#     server_sock.listen(1)
-#     print(f"[DataReceiver] Listening on {host}:{port}")
-
-#     conn, addr = server_sock.accept()
-#     print(f"[DataReceiver] Connected by {addr}")
-#     handle_data_connection(conn, model)
 def _start_data_thread(host, port, model):
     server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

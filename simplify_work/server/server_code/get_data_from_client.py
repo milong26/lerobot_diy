@@ -7,7 +7,7 @@ from model_loader import load_policy
 import torch
 import time
 
-
+# 预热
 def load_and_warmup_model():
     print("[Init] Loading model...")
     model = load_policy()
@@ -29,26 +29,6 @@ def load_and_warmup_model():
         observation["observation.images.wrist"]
     ]
     
-    print("=== 字典内容检查1 ===")
-    for key, value in observation.items():
-        dtype = type(value).__name__
-
-        # 尝试获取 shape 或长度
-        shape_or_len = None
-        if hasattr(value, 'shape'):
-            shape_or_len = f"shape: {value.shape}"
-        elif isinstance(value, (list, tuple, dict, str)):
-            shape_or_len = f"len: {len(value)}"
-
-        print(f"- Key: {key}")
-        print(f"  类型: {dtype}")
-        if shape_or_len:
-            print(f"  大小: {shape_or_len}")
-        else:
-            print("  大小: 不适用")
-        print()
-
-
     observation = copy(observation)
     with (
         torch.inference_mode(),
@@ -77,11 +57,8 @@ def load_and_warmup_model():
 
         # 原来本地调用polciy
 
-        action = model.select_action(observation)
-        print(action)
-
-    # with torch.no_grad():
-    #     _ = model(batch)
+    with torch.no_grad():
+        _ = model(observation)
 
     print("[Init] Model loaded and warmed up.")
     return model
