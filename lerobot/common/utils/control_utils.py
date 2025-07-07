@@ -24,8 +24,20 @@ from copy import copy
 from functools import cache
 
 # 服务器推理
-from simplify_work.server.local_code.predict_from_server_api import predict_from_server
+import os
+import sys
 
+# 获取该文件所在目录（control_utils.py）
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 找到 simplify_work/server/local_code 所在目录的绝对路径
+predict_code_dir = os.path.abspath(os.path.join(current_dir, '../../../simplify_work/server/local_code'))
+
+# 临时加入 Python 模块搜索路径
+if predict_code_dir not in sys.path:
+    sys.path.insert(0, predict_code_dir)
+
+from predict_from_server_api import predict_from_server
 import numpy as np
 import torch
 from deepdiff import DeepDiff
@@ -135,10 +147,15 @@ def predict_action(
         """
         使用服务器推理。给服务器传observation，接收服务器的action
         """
-        action=predict_from_server(policy,observation)
+        for name, param in policy.named_parameters():
+            print(name, torch.sum(param).item())
+            break  # 打印第一个就行，足够检测差异
+        action=predict_from_server(observation)
+        # print(action)
+        # raise KeyError("啊吧")
 
         # 原来本地调用polciy
-        action = policy.select_action(observation)
+        # action = policy.select_action(observation)
 
         # Remove batch dimension
         action = action.squeeze(0)
