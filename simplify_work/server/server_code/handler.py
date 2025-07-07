@@ -2,7 +2,7 @@
 import socket
 import threading
 import json
-from lerobot_diy.simplify_work.server.server_code.model_loader import load_policy
+from model_loader import load_policy
 import torch
 import numpy as np
 from image_receiver import image_buffer, lock
