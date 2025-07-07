@@ -69,6 +69,7 @@ def predict_from_server(observation):
                     'observation.images.wrist']:
         img_tensor = observation.pop(cam_key)
         img_array = img_tensor.squeeze().cpu().numpy()
+        img_array = np.transpose(img_array, (1, 2, 0))
         cam_name = cam_key.split('.')[-1]
         image_queue.put({"name": cam_name, "data": img_array})
 
@@ -82,7 +83,10 @@ def predict_from_server(observation):
 
     request_queue.put(payload)
     result = response_queue.get()
-    return result
+    if isinstance(result, dict) and "action" in result:
+        action = result["action"]  # 提取数组
+        action = torch.tensor(action, dtype=torch.float32)
+    return action
 
 def shutdown_clients():
     request_queue.put(None)

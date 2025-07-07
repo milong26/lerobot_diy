@@ -5,9 +5,9 @@ from predict_from_server_api import predict_from_server,shutdown_clients
 # 构造 observation
 observation = {
     'observation.state': torch.rand(1, 6),
-    'observation.force': torch.rand(1, 15),
-    'observation.images.scene': torch.rand(3, 480, 640),
-    'observation.images.scene_depth': torch.rand(3, 480, 640),
+    # 'observation.force': torch.rand(1, 15),
+    'observation.images.side': torch.rand(3, 480, 640),
+    # 'observation.images.scene_depth': torch.rand(3, 480, 640),
     'observation.images.wrist': torch.rand(3, 480, 640),
     'task': 'pick apple',
     'robot_type': 'so100',
