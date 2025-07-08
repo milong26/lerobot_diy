@@ -168,6 +168,7 @@ def make_policy(
         policy = policy_cls.from_pretrained(**kwargs)
     else:
         # Make a fresh policy.
+        print("policy是一个空的model")
         policy = policy_cls(**kwargs)
 
     policy.to(cfg.device)
