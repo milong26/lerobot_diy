@@ -99,7 +99,7 @@ def handle_data_connection(conn, model):
     conn.close()
 
 
-def start_data_server(host='0.0.0.0', port=9001, model=None):
+def start_data_server(host='0.0.0.0', port=9101, model=None):
     threading.Thread(target=_start_data_thread, args=(host, port, model), daemon=True).start()
 
 
