@@ -1,0 +1,28 @@
+# CUDA_VISIBLE_DEVICES=2 HF_HUB_OFFLINE=1 python lerobot/scripts/train.py --config_path=simplify_work/work/fine_tune_0709_first100.yaml
+# 用的inputfeature有什么？
+policy:
+  path: models/forsmolvla/smolvla_base
+
+dataset:
+  repo_id: lerobot/svla_so101_pickplace
+  root: training_dataset/0709data_first100
+
+# batch_size和steps是默认的
+batch_size: 64
+steps: 20000
+output_dir: outputs/train/0709_first100
+job_name: training_pickplace_with_first100
+# wandb墙了没法用
+wandb:
+  enable: false
+
+# 这个默认
+policy:
+  device: cuda
+  repo_id: lerobot/smolvla_base
+  type: smolvla
+
+# 可以根据需求改
+use_depth_image: false
+use_force: false
+use_language_tip: false

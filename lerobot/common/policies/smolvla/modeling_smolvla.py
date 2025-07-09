@@ -77,21 +77,25 @@ from lerobot.common.policies.utils import (
 from lerobot.common.utils.utils import get_safe_dtype
 
 
-# 服务器推理
-import os
-import sys
+IS_LOCAL = os.environ.get("ENV", "") == "local"
+print(f"IS_LOCAL = {IS_LOCAL}")
+# 如果判断是本地的
+if IS_LOCAL:
+    # 服务器推理
+    import sys
 
-# 获取该文件所在目录（control_utils.py）
-current_dir = os.path.dirname(os.path.abspath(__file__))
+    # 获取该文件所在目录（control_utils.py）
+    current_dir = os.path.dirname(os.path.abspath(__file__))
 
-# 找到 simplify_work/server/local_code 所在目录的绝对路径
-predict_code_dir = os.path.abspath(os.path.join(current_dir, '../../../../simplify_work/server/local_code'))
+    # 找到 simplify_work/server/local_code 所在目录的绝对路径
+    predict_code_dir = os.path.abspath(os.path.join(current_dir, '../../../../simplify_work/server/local_code'))
 
-# 临时加入 Python 模块搜索路径
-if predict_code_dir not in sys.path:
-    sys.path.insert(0, predict_code_dir)
-
-# from predict_from_server_api import predict_from_server
+    # 临时加入 Python 模块搜索路径
+    if predict_code_dir not in sys.path:
+        sys.path.insert(0, predict_code_dir)
+    from predict_from_server_api import predict_from_server
+# 本地就使用这个
+# 
 
 # Matches ".soNNN", optionally followed by "-something", up to the "_buffer_" marker
 _VARIANT_RE = re.compile(r"\.so\d+(?:-[\w]+)?_buffer_")
@@ -428,20 +432,16 @@ class SmolVLAPolicy(PreTrainedPolicy):
             else:
                 return obj  # 保持原样
 
-        # 示例
-        batch_clean = tensor_to_list(batch)
+        # 开启服务器推理。本地使用这个，并且注释掉后面四行。
+        if IS_LOCAL:
+            actions=predict_from_server(batch)
+        else:
+        # 服务器就注释掉上面一行，使用下面四行。
 
-        with open("seeobservation.txt", "w", encoding="utf-8") as f:
-            json.dump(batch_clean, f, ensure_ascii=False, indent=2)
-        # 开启服务器推理,
-        actions=predict_from_server(batch)
-
-        # images, img_masks = self.prepare_images(batch)
-        # state = self.prepare_state(batch)
-        # lang_tokens, lang_masks = self.prepare_language(batch)
-        # print("noise=",noise)
-
-        # actions = self.model.sample_actions(images, img_masks, lang_tokens, lang_masks, state, noise=noise)
+            images, img_masks = self.prepare_images(batch)
+            state = self.prepare_state(batch)
+            lang_tokens, lang_masks = self.prepare_language(batch)
+            actions = self.model.sample_actions(images, img_masks, lang_tokens, lang_masks, state, noise=noise)
 
         # Unpad actions
         original_action_dim = self.config.action_feature.shape[0]
