@@ -35,24 +35,42 @@ def start_non_image_thread():
         sock.connect((server_ip, text_port))
         print("[DataSender] Connected to server for non-image data")
 
+        buffer = b""
         while True:
             payload = request_queue.get()
             if payload is None:
-                break  # 停止信号
+                break
 
             try:
-                # 发送非图像 json 数据
-                sock.sendall(json.dumps(payload).encode('utf-8'))
-                # 接收预测结果
-                received = sock.recv(4096)
-                result = json.loads(received.decode('utf-8'))
+                # 发送json数据
+                json_str = json.dumps(payload)
+                sock.sendall(json_str.encode('utf-8'))
+
+                # 这里改为循环接收，直到完整收到一条JSON消息
+                while True:
+                    data = sock.recv(4096)
+                    if not data:
+                        # 连接关闭
+                        raise ConnectionError("连接关闭")
+                    buffer += data
+                    try:
+                        # 尝试解json
+                        result = json.loads(buffer.decode('utf-8'))
+                        buffer = b""  # 清空缓存
+                        break  # 成功解析跳出循环
+                    except json.JSONDecodeError:
+                        # JSON未完整，继续收
+                        continue
+
                 response_queue.put(result)
+
             except Exception as e:
                 print(f"[DataSender] Error: {e}")
                 response_queue.put(None)
                 break
 
         sock.close()
+
 
     threading.Thread(target=send_non_image_data, daemon=True).start()
 
@@ -83,10 +101,14 @@ def predict_from_server(observation):
 
     request_queue.put(payload)
     result = response_queue.get()
-    if isinstance(result, dict) and "action" in result:
-        action = result["action"]  # 提取数组
-        action = torch.tensor(action, dtype=torch.float32)
-    return action
+    # print("result=", result)  # 这里你已经打印了服务器返回的数据
+    if result is None:
+        raise RuntimeError("服务器返回无效数据")
+
+    action_list = result["action"]
+    action_tensor = torch.tensor(action_list, dtype=torch.float32, device='cpu')
+    return action_tensor
+
 
 def shutdown_clients():
     request_queue.put(None)

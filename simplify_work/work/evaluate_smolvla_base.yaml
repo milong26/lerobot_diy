@@ -3,8 +3,8 @@
 # sudo chmod 666 /dev/ttyACM0
 # python -m lerobot.record --config_path=simplify_work/work/evaluate_smolvla_base.yaml
 
-policy:
-  path: home/qwe/.cache/huggingface/lerobot/trained_baseline_locally/77download/pretrained/pretrained_model
+# policy:
+#   path: /home/qwe/.cache/huggingface/lerobot/trained_baseline_locally/77download/pretrained/pretrained_model
 robot:
   type: so100_follower
   port: /dev/ttyACM0
@@ -40,10 +40,10 @@ teleop:
 display_data: false
 
 dataset:
-  repo_id: 0706eval/eval_pickplacebasleine
+  repo_id: 0708eval/eval_pickplacebasleine_local
   num_episodes: 1
   single_task: "pick up the orange tomato and place it into the box."
-  episode_time_s: 30
+  episode_time_s: 300
   push_to_hub: false
   reset_time_s: 0
 
