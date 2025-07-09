@@ -22,8 +22,8 @@ from torchvision.models._utils import IntermediateLayerGetter
 from torchvision.ops.misc import FrozenBatchNorm2d
 import time
 
-from lerobot.common.policies.smolvla.configuration_smolvla import SmolVLAConfig
-from lerobot.common.policies.smolvla.modeling_smolvla import SmolVLAPolicy
+from lerobot.policies.smolvla.configuration_smolvla import SmolVLAConfig
+from lerobot.policies.smolvla.modeling_smolvla import SmolVLAPolicy
 from lerobot.configs.types import FeatureType, PolicyFeature
 
 

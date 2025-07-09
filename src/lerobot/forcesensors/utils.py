@@ -18,8 +18,8 @@ import platform
 from pathlib import Path
 from typing import TypeAlias
 
-from lerobot.common.forcesensors.configs import ForceSensorConfig
-from lerobot.common.forcesensors.forcesensor import ForceSensor
+from lerobot.forcesensors.configs import ForceSensorConfig
+from lerobot.forcesensors.forcesensor import ForceSensor
 
 
 
