@@ -286,6 +286,11 @@ def record(cfg: RecordConfig) -> LeRobotDataset:
 
     # Load pretrained policy
     policy = None if cfg.policy is None else make_policy(cfg.policy, ds_meta=dataset.meta)
+    # import torch
+    # for name, param in policy.named_parameters():
+    #     print(name, torch.sum(param).item())
+    #     break  # 打印第一个就行，足够检测差异
+
 
     robot.connect()
     if teleop is not None:

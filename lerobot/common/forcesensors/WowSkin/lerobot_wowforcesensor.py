@@ -74,4 +74,4 @@ class WowForceSensor(ForceSensor):
             self.started = False
         else:
             print("Sensor stream already stopped.")
-        self._log_f.close()
+        

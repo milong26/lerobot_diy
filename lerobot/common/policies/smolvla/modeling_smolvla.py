@@ -373,7 +373,6 @@ class SmolVLAPolicy(PreTrainedPolicy):
         # self.language_tokenizer = AutoProcessor.from_pretrained(self.config.vlm_model_name).tokenizer
 
         self.language_tokenizer = AutoProcessor.from_pretrained(self.config.vlm_model_name, local_files_only=True).tokenizer
-        # 这里应该能正常，但是config又不对
         self.model = VLAFlowMatching(config)
         self.reset()
 
@@ -416,13 +415,33 @@ class SmolVLAPolicy(PreTrainedPolicy):
 
         actions = self.model.sample_actions(images, img_masks, lang_tokens, lang_masks, state, noise=noise)
         """
-        # actions=predict_from_server(batch)
+        import json
+        import torch
 
-        images, img_masks = self.prepare_images(batch)
-        state = self.prepare_state(batch)
-        lang_tokens, lang_masks = self.prepare_language(batch)
+        def tensor_to_list(obj):
+            if isinstance(obj, torch.Tensor):
+                return obj.detach().cpu().tolist()  # 转 list（在 GPU 上也能安全处理）
+            elif isinstance(obj, dict):
+                return {k: tensor_to_list(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [tensor_to_list(i) for i in obj]
+            else:
+                return obj  # 保持原样
 
-        actions = self.model.sample_actions(images, img_masks, lang_tokens, lang_masks, state, noise=noise)
+        # 示例
+        batch_clean = tensor_to_list(batch)
+
+        with open("seeobservation.txt", "w", encoding="utf-8") as f:
+            json.dump(batch_clean, f, ensure_ascii=False, indent=2)
+        # 开启服务器推理,
+        actions=predict_from_server(batch)
+
+        # images, img_masks = self.prepare_images(batch)
+        # state = self.prepare_state(batch)
+        # lang_tokens, lang_masks = self.prepare_language(batch)
+        # print("noise=",noise)
+
+        # actions = self.model.sample_actions(images, img_masks, lang_tokens, lang_masks, state, noise=noise)
 
         # Unpad actions
         original_action_dim = self.config.action_feature.shape[0]
@@ -919,6 +938,7 @@ class VLAFlowMatching(nn.Module):
             use_cache=self.config.use_cache,
             fill_kv_cache=True,
         )
+        # num_steps扩散模型 控制扩散模型在采样过程中迭代多少次（越多越慢但更精确
         dt = -1.0 / self.config.num_steps
         dt = torch.tensor(dt, dtype=torch.float32, device=device)
 
