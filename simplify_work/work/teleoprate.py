@@ -2,10 +2,10 @@
 # 需要提前calibrate，calibrate文件的xxx.json里面的xxx就对应robot的id
 
 
-from lerobot.common.cameras.opencv.configuration_opencv import OpenCVCameraConfig
-from lerobot.common.cameras.realsense.configuration_realsense import RealSenseCameraConfig
-from lerobot.common.teleoperators.so100_leader import SO100LeaderConfig, SO100Leader
-from lerobot.common.robots.so100_follower import SO100FollowerConfig, SO100Follower
+from lerobot.cameras.opencv.configuration_opencv import OpenCVCameraConfig
+from lerobot.cameras.realsense.configuration_realsense import RealSenseCameraConfig
+from lerobot.teleoperators.so100_leader import SO100LeaderConfig, SO100Leader
+from lerobot.robots.so100_follower import SO100FollowerConfig, SO100Follower
 
 # 相机
 camera_config = {

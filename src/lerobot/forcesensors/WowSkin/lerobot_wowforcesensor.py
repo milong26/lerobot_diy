@@ -1,7 +1,7 @@
 import time
 from anyskin import AnySkinProcess
-from lerobot.common.forcesensors.WowSkin.lerobot_wowconfig import WowForceSensorConfig
-from lerobot.common.forcesensors.forcesensor import ForceSensor
+from lerobot.forcesensors.WowSkin.lerobot_wowconfig import WowForceSensorConfig
+from lerobot.forcesensors.forcesensor import ForceSensor
 import numpy as np
 
 

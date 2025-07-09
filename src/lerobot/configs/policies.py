@@ -69,8 +69,6 @@ class PreTrainedConfig(draccus.ChoiceRegistry, HubMixin, abc.ABC):
     tags: list[str] | None = None
     # Add tags to your policy on the hub.
     license: str | None = None
-    # accelerate
-    gradient_accumulation_steps: int = 1
 
     def __post_init__(self):
         self.pretrained_path = None
