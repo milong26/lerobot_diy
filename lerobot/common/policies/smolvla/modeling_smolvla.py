@@ -91,7 +91,7 @@ predict_code_dir = os.path.abspath(os.path.join(current_dir, '../../../../simpli
 if predict_code_dir not in sys.path:
     sys.path.insert(0, predict_code_dir)
 
-from predict_from_server_api import predict_from_server
+# from predict_from_server_api import predict_from_server
 
 # Matches ".soNNN", optionally followed by "-something", up to the "_buffer_" marker
 _VARIANT_RE = re.compile(r"\.so\d+(?:-[\w]+)?_buffer_")

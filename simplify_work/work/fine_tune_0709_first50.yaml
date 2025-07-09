@@ -1,0 +1,24 @@
+# CUDA_VISIBLE_DEVICES=1 HF_HUB_OFFLINE=1 python lerobot/scripts/train.py --config_path=simplify_work/work/fine_tune_0709_first50.yaml
+# 用的inputfeature有什么？
+policy:
+  path: models/forsmolvla/smolvla_base
+
+dataset:
+  repo_id: lerobot/svla_so101_pickplace
+  root: training_dataset/0709data_first50
+
+batch_size: 64
+steps: 20000
+output_dir: outputs/train/0709_first50
+job_name: training_pickplace_with_first50
+wandb:
+  enable: false
+
+policy:
+  device: cuda
+  repo_id: lerobot/smolvla_base
+  type: smolvla
+
+use_depth_image: false
+use_force: false
+use_language_tip: false

@@ -55,11 +55,8 @@ def load_and_warmup_model():
         使用服务器推理。给服务器传observation，接收服务器的action
         """
 
-        # 原来本地调用polciy
-
-    with torch.no_grad():
-        _ = model(observation)
-
+    # 随便推理一个
+    _ = model.select_action(observation)
     print("[Init] Model loaded and warmed up.")
     return model
 

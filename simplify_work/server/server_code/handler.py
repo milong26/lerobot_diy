@@ -31,7 +31,8 @@ def preprocess_observation_server(observation, device="cuda"):
             if isinstance(observation[name], np.ndarray):  # ✅ 只处理 numpy 数组
                 observation[name] = torch.from_numpy(observation[name])
                 if "image" in name:
-                    observation[name] = observation[name].type(torch.float32) / 255
+                    # 数值的改变已经在传数据之前做过了
+                    # observation[name] = observation[name].type(torch.float32) / 255
                     observation[name] = observation[name].permute(2, 0, 1).contiguous()
                 observation[name] = observation[name].unsqueeze(0)
                 observation[name] = observation[name].to("cuda")
@@ -48,7 +49,7 @@ def handle_data_connection(conn, model):
                 break
 
             payload = json.loads(data.decode('utf-8'))
-            print("payload内容",payload)
+            # print("payload内容",payload)
 
             observation = {}
             for key, val in payload.items():
@@ -77,17 +78,20 @@ def handle_data_connection(conn, model):
             ]
             # 需要确保这里的observation格式一致
             batch=preprocess_observation_server(observation=observation)
+
             # 整理 batch 格式供模型推理
-            # 参考_get_action_chunk函数
+            # batch传进来的时候从record时候的原始数据经过了numpy->tensor、归一和stack三次操作。
+            # 数值变化保留了，就是numpy->tensor还要做一下处理
+            # 参考_get_action_chunk函数和之前的
             images, img_masks = model.prepare_images(batch)
             state = model.prepare_state(batch)
             lang_tokens, lang_masks = model.prepare_language(batch)
             # 看了下好像没有noise？
             noise=None
-
-            actions = model.model.sample_actions(images, img_masks, lang_tokens, lang_masks, state, noise=noise)
+            with torch.no_grad():
+                actions = model.model.sample_actions(images, img_masks, lang_tokens, lang_masks, state, noise=noise)
             print("推理后",time.time())
-            print(actions)
+            # print(actions)
 
             # 返回结果
             conn.sendall(json.dumps({"action": actions.tolist()}).encode('utf-8'))
