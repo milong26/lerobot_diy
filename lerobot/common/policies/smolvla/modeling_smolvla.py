@@ -938,6 +938,7 @@ class VLAFlowMatching(nn.Module):
             use_cache=self.config.use_cache,
             fill_kv_cache=True,
         )
+        # num_steps扩散模型 控制扩散模型在采样过程中迭代多少次（越多越慢但更精确
         dt = -1.0 / self.config.num_steps
         dt = torch.tensor(dt, dtype=torch.float32, device=device)
 
