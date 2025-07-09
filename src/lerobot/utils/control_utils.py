@@ -128,12 +128,6 @@ def predict_action(
         # based on the current observation
 
  
-        # 使用服务器推理。给服务器传observation，接收服务器的action
-        # 以前想这么做的但是这样就没法用queue了
-        # action=predict_from_server(observation)
-        # print(action)
-
-        # 原来本地调用polciy
         action = policy.select_action(observation)
 
         # Remove batch dimension
