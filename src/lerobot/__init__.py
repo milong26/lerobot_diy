@@ -200,6 +200,10 @@ available_policies_per_env = {
     "aloha_real": ["act_aloha_real"],
 }
 
+
+available_force_sensors={
+    "wowforcesensor"
+}
 env_task_pairs = [(env, task) for env, tasks in available_tasks_per_env.items() for task in tasks]
 env_dataset_pairs = [
     (env, dataset) for env, datasets in available_datasets_per_env.items() for dataset in datasets

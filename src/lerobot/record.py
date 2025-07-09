@@ -47,6 +47,7 @@ from lerobot.cameras import (  # noqa: F401
 )
 from lerobot.cameras.opencv.configuration_opencv import OpenCVCameraConfig  # noqa: F401
 from lerobot.cameras.realsense.configuration_realsense import RealSenseCameraConfig  # noqa: F401
+from lerobot.forcesensors.WowSkin.lerobot_wowconfig import WowForceSensorConfig  # noqa: F401
 from lerobot.configs import parser
 from lerobot.configs.policies import PreTrainedConfig
 from lerobot.datasets.image_writer import safe_stop_image_writer
@@ -309,6 +310,9 @@ def record(cfg: RecordConfig) -> LeRobotDataset:
     recorded_episodes = 0
     while recorded_episodes < cfg.dataset.num_episodes and not events["stop_recording"]:
         log_say(f"Recording episode {dataset.num_episodes}", cfg.play_sounds)
+        # 如果用传感器就归零
+        if cfg.robot.sensors:
+            robot.gui0sensor()
         record_loop(
             robot=robot,
             events=events,
