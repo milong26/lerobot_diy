@@ -57,6 +57,7 @@ import os
 # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
+# 为了filter raw dataset
 class FilteredBatchLoader:
     def __init__(self, dataloader, exclude_keys: list):
         self.dataloader = dataloader
@@ -123,31 +124,6 @@ def update_policy(
     train_metrics.lr = optimizer.param_groups[0]["lr"]
     train_metrics.update_s = time.perf_counter() - start_time
     return train_metrics, output_dict
-
-def modify_language(batch):
-    return batch
-# # 增加过滤feature
-# 本来这么写是每个batch都要处理，太麻烦了
-# def filter_batch_features(batch, cfg):
-#     filtered = {}
-#     exclude_features = []
-#     if not cfg.use_depth_image:
-#         # 只有一个scene有，先凑合用
-#         exclude_features.append("observation.images.side_depth")
-#         exclude_features.append("observation.images.side_depth_is_pad")
-#     if not cfg.use_force:
-#         exclude_features.append("observation.force")
-#         exclude_features.append("observation.force_is_pad")
-
-#     for key, value in batch.items():
-#         if key not in exclude_features:
-#             filtered[key] = value
-#     # 添加language instruction，此时一定有observation.scene和observation.scene_depth
-#     # if  cfg.use_language_tip:
-#     #     filtered["task"]=modify_language(batch)
-#     return filtered
-
-
 
 
 @parser.wrap()
@@ -228,9 +204,6 @@ def train(cfg: TrainPipelineConfig):
         pin_memory=device.type != "cpu",
         drop_last=False,
     )
-
-    # 方便排除
-
     #  构造 exclude list
     exclude_features = []
     if not cfg.use_depth_image:
@@ -245,7 +218,6 @@ def train(cfg: TrainPipelineConfig):
     dataloader = FilteredBatchLoader(raw_dataloader, exclude_features)
     peek_batch = next(iter(dataloader))
     print("真正训练的时候甬道的feature：", list(peek_batch.keys()))
-
     dl_iter = cycle(dataloader)
 
     policy.train()
@@ -271,13 +243,6 @@ def train(cfg: TrainPipelineConfig):
         for key in batch:
             if isinstance(batch[key], torch.Tensor):
                 batch[key] = batch[key].to(device, non_blocking=True)
-
-        # """
-        # 过滤不需要的feature
-        # """
-        # batch = filter_batch_features(batch, cfg)
-        # print("训练的时候有:",batch.keys())
-
 
         train_tracker, output_dict = update_policy(
             train_tracker,
