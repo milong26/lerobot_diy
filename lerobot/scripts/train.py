@@ -57,6 +57,22 @@ import os
 # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
+class FilteredBatchLoader:
+    def __init__(self, dataloader, exclude_keys: list):
+        self.dataloader = dataloader
+        self.exclude_keys = set(exclude_keys)
+
+    def __iter__(self):
+        for batch in self.dataloader:
+            yield {
+                k: v for k, v in batch.items() if k not in self.exclude_keys
+            }
+
+    def __len__(self):
+        return len(self.dataloader)
+
+
+
 def update_policy(
     train_metrics: MetricsTracker,
     policy: PreTrainedPolicy,
@@ -110,25 +126,26 @@ def update_policy(
 
 def modify_language(batch):
     return batch
-# 增加过滤feature
-def filter_batch_features(batch, cfg):
-    filtered = {}
-    exclude_features = []
-    if not cfg.use_depth_image:
-        # 只有一个scene有，先凑合用
-        exclude_features.append("observation.images.side_depth")
-        exclude_features.append("observation.images.side_depth_is_pad")
-    if not cfg.use_force:
-        exclude_features.append("observation.force")
-        exclude_features.append("observation.force_is_pad")
+# # 增加过滤feature
+# 本来这么写是每个batch都要处理，太麻烦了
+# def filter_batch_features(batch, cfg):
+#     filtered = {}
+#     exclude_features = []
+#     if not cfg.use_depth_image:
+#         # 只有一个scene有，先凑合用
+#         exclude_features.append("observation.images.side_depth")
+#         exclude_features.append("observation.images.side_depth_is_pad")
+#     if not cfg.use_force:
+#         exclude_features.append("observation.force")
+#         exclude_features.append("observation.force_is_pad")
 
-    for key, value in batch.items():
-        if key not in exclude_features:
-            filtered[key] = value
-    # 添加language instruction，此时一定有observation.scene和observation.scene_depth
-    # if  cfg.use_language_tip:
-    #     filtered["task"]=modify_language(batch)
-    return filtered
+#     for key, value in batch.items():
+#         if key not in exclude_features:
+#             filtered[key] = value
+#     # 添加language instruction，此时一定有observation.scene和observation.scene_depth
+#     # if  cfg.use_language_tip:
+#     #     filtered["task"]=modify_language(batch)
+#     return filtered
 
 
 
@@ -202,7 +219,7 @@ def train(cfg: TrainPipelineConfig):
         shuffle = True
         sampler = None
 
-    dataloader = torch.utils.data.DataLoader(
+    raw_dataloader = torch.utils.data.DataLoader(
         dataset,
         num_workers=cfg.num_workers,
         batch_size=cfg.batch_size,
@@ -211,6 +228,24 @@ def train(cfg: TrainPipelineConfig):
         pin_memory=device.type != "cpu",
         drop_last=False,
     )
+
+    # 方便排除
+
+    #  构造 exclude list
+    exclude_features = []
+    if not cfg.use_depth_image:
+        exclude_features += ["observation.images.side_depth", "observation.images.side_depth_is_pad"]
+    if not cfg.use_force:
+        exclude_features += ["observation.force", "observation.force_is_pad"]
+    if not cfg.use_language_tip:
+        # 加语言引导的
+        pass
+
+    #  包装 dataloader
+    dataloader = FilteredBatchLoader(raw_dataloader, exclude_features)
+    peek_batch = next(iter(dataloader))
+    print("真正训练的时候甬道的feature：", list(peek_batch.keys()))
+
     dl_iter = cycle(dataloader)
 
     policy.train()
@@ -237,10 +272,10 @@ def train(cfg: TrainPipelineConfig):
             if isinstance(batch[key], torch.Tensor):
                 batch[key] = batch[key].to(device, non_blocking=True)
 
-        """
-        过滤不需要的feature
-        """
-        batch = filter_batch_features(batch, cfg)
+        # """
+        # 过滤不需要的feature
+        # """
+        # batch = filter_batch_features(batch, cfg)
         # print("训练的时候有:",batch.keys())
 
 
