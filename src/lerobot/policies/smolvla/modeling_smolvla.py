@@ -88,14 +88,13 @@ if IS_LOCAL:
     current_dir = os.path.dirname(os.path.abspath(__file__))
 
     # 找到 simplify_work/server/local_code 所在目录的绝对路径
-    predict_code_dir = os.path.abspath(os.path.join(current_dir, '../../../../simplify_work/server/local_code'))
+    predict_code_dir = os.path.abspath(os.path.join(current_dir, '../../../../../simplify_work/server/local_code'))
 
     # 临时加入 Python 模块搜索路径
     if predict_code_dir not in sys.path:
         sys.path.insert(0, predict_code_dir)
     from predict_from_server_api import predict_from_server
-# 本地就使用这个
-# 
+
 
 # Matches ".soNNN", optionally followed by "-something", up to the "_buffer_" marker
 _VARIANT_RE = re.compile(r"\.so\d+(?:-[\w]+)?_buffer_")
@@ -419,19 +418,6 @@ class SmolVLAPolicy(PreTrainedPolicy):
 
         actions = self.model.sample_actions(images, img_masks, lang_tokens, lang_masks, state, noise=noise)
         """
-        import json
-        import torch
-
-        def tensor_to_list(obj):
-            if isinstance(obj, torch.Tensor):
-                return obj.detach().cpu().tolist()  # 转 list（在 GPU 上也能安全处理）
-            elif isinstance(obj, dict):
-                return {k: tensor_to_list(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [tensor_to_list(i) for i in obj]
-            else:
-                return obj  # 保持原样
-
         # 开启服务器推理。本地使用这个，并且注释掉后面四行。
         if IS_LOCAL:
             actions=predict_from_server(batch)
