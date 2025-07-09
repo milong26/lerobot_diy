@@ -18,8 +18,9 @@ import logging
 import time
 from functools import cached_property
 from typing import Any
-
+from lerobot.forcesensors.utils import make_force_sensor_from_configs
 from lerobot.cameras.utils import make_cameras_from_configs
+from lerobot.cameras.realsense.camera_realsense import RealSenseCamera
 from lerobot.errors import DeviceAlreadyConnectedError, DeviceNotConnectedError
 from lerobot.motors import Motor, MotorCalibration, MotorNormMode
 from lerobot.motors.feetech import (
@@ -59,6 +60,9 @@ class SO100Follower(Robot):
             calibration=self.calibration,
         )
         self.cameras = make_cameras_from_configs(config.cameras)
+        # make force sensor
+        if self.config.sensors:
+            self.force_sensors=make_force_sensor_from_configs(config.sensors)
 
     @property
     def _motors_ft(self) -> dict[str, type]:
@@ -66,12 +70,44 @@ class SO100Follower(Robot):
 
     @property
     def _cameras_ft(self) -> dict[str, tuple]:
-        return {
-            cam: (self.config.cameras[cam].height, self.config.cameras[cam].width, 3) for cam in self.cameras
-        }
+        cam_ft = {}
+        for cam_key, cam in self.cameras.items():
+            cam_ft[cam_key] = (
+                self.config.cameras[cam_key].height,
+                self.config.cameras[cam_key].width,
+                3,
+            )
+            if type(cam) is RealSenseCamera:
+                if cam.use_depth:
+                    cam_ft[f"{cam_key}_depth"] = (
+                        self.config.cameras[cam_key].height,
+                        self.config.cameras[cam_key].width,
+                        3,  # 假设深度图也有3通道（或你可以根据实际改为1）
+                    )
+        return cam_ft
 
+
+    @property
+    def _sensors_ft(self) -> dict[str, tuple]:
+        sensor_ft={}
+        if self.config.sensors:
+
+
+            # for sensor_key, sensor in self.force_sensors.items():
+            #     sensor_ft[sensor_key] = (
+            #         self.config.cameras[cam_key].height,
+            #         self.config.cameras[cam_key].width,
+            #         3,
+            #     )
+            sensor_ft["observation.force"] = {
+                "dtype": "float64",
+                "shape": (15,),  # 15个点
+            }
+        return sensor_ft
     @cached_property
     def observation_features(self) -> dict[str, type | tuple]:
+        if self.config.sensors:
+            return {**self._motors_ft, **self._cameras_ft,**self._sensors_ft}
         return {**self._motors_ft, **self._cameras_ft}
 
     @cached_property
@@ -97,8 +133,18 @@ class SO100Follower(Robot):
         for cam in self.cameras.values():
             cam.connect()
 
+        # 启动sensor
+        if self.config.sensors:
+            for sensor in self.force_sensors.values():
+                sensor.connect()
         self.configure()
         logger.info(f"{self} connected.")
+    # sensor 归零，用在每次开始record之前
+    def gui0sensor(self):
+        print("sensor归零")
+        if self.config.sensors:
+            for sensor in self.force_sensors.values():
+                sensor.get_baseline()
 
     @property
     def is_calibrated(self) -> bool:
@@ -143,10 +189,10 @@ class SO100Follower(Robot):
             for motor in self.bus.motors:
                 self.bus.write("Operating_Mode", motor, OperatingMode.POSITION.value)
                 # Set P_Coefficient to lower value to avoid shakiness (Default is 32)
-                self.bus.write("P_Coefficient", motor, 16)
+                self.bus.write("P_Coefficient", motor, 12)
                 # Set I_Coefficient and D_Coefficient to default value 0 and 32
                 self.bus.write("I_Coefficient", motor, 0)
-                self.bus.write("D_Coefficient", motor, 32)
+                self.bus.write("D_Coefficient", motor, 0)
 
     def setup_motors(self) -> None:
         for motor in reversed(self.bus.motors):
@@ -168,10 +214,23 @@ class SO100Follower(Robot):
         # Capture images from cameras
         for cam_key, cam in self.cameras.items():
             start = time.perf_counter()
-            obs_dict[cam_key] = cam.async_read()
+
+            if type(cam) is RealSenseCamera:
+                color, depth = cam.async_read_combined()
+                obs_dict[cam_key]=color
+                if depth is not None:
+                    obs_dict[cam_key+"_depth"]=depth
+            else:
+                obs_dict[cam_key] = cam.async_read()
+
             dt_ms = (time.perf_counter() - start) * 1e3
             logger.debug(f"{self} read {cam_key}: {dt_ms:.1f}ms")
-
+            # 获取force 
+        if self.config.sensors:
+            for sensor_key, sensor in self.force_sensors.items():
+                # 目前只有一个sensor就直接写吧
+                obs_dict["observation.force"] = sensor.get_data()
+                logger.debug(f"{self} read {sensor_key}")
         return obs_dict
 
     def send_action(self, action: dict[str, Any]) -> dict[str, Any]:
@@ -210,5 +269,8 @@ class SO100Follower(Robot):
         self.bus.disconnect(self.config.disable_torque_on_disconnect)
         for cam in self.cameras.values():
             cam.disconnect()
-
+        # 关闭sensor
+        if self.config.sensors:
+            for sensor in self.force_sensors.values():
+                sensor.disconnect()
         logger.info(f"{self} disconnected.")

@@ -1,10 +1,7 @@
-# conda activate lerobot
-# 检查端口： python src/lerobot/find_port.py
+# python src/lerobot/find_port.py
 # sudo chmod 666 /dev/ttyACM0
-# python -m lerobot.record --config_path=simplify_work/work/evaluate_smolvla_base.yaml
+# PYTHONPATH=src python -m lerobot.record --config_path=simplify_work/work/collect/collect_data_template.yaml
 
-# policy:
-#   path: /home/qwe/.cache/huggingface/lerobot/trained_baseline_locally/77download/pretrained/pretrained_model
 robot:
   type: so100_follower
   port: /dev/ttyACM0
@@ -23,11 +20,11 @@ robot:
       width: 640
       height: 480
       fps: 30
-  # sensors:
-  #   wrist:
-  #     type: WowForceSensor
-  #     port: /dev/ttyACM2
-  #     num_mags: 5
+  sensors:
+    wrist:
+      type: WowForceSensor
+      port: /dev/ttyACM2
+      num_mags: 5
   
 
 teleop:
@@ -40,12 +37,9 @@ teleop:
 display_data: false
 
 dataset:
-  repo_id: 0708eval/eval_pickplacebasleine_local
+  repo_id: test/collect_1
   num_episodes: 1
   single_task: "pick up the orange tomato and place it into the box."
-  episode_time_s: 300
+  episode_time_s: 15
   push_to_hub: false
   reset_time_s: 0
-
-policy:
-  type: smolvla

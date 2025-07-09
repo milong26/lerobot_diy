@@ -32,6 +32,9 @@ def log_rerun_data(observation: dict[str | Any], action: dict[str | Any]):
     for obs, val in observation.items():
         if isinstance(val, float):
             rr.log(f"observation.{obs}", rr.Scalar(val))
+        elif obs=="observation.force":
+              # force先不绘制
+              continue
         elif isinstance(val, np.ndarray):
             if val.ndim == 1:
                 for i, v in enumerate(val):

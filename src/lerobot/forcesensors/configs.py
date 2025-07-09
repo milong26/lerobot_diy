@@ -8,7 +8,6 @@ import draccus
 
 @dataclass(kw_only=True)
 class ForceSensorConfig(draccus.ChoiceRegistry, abc.ABC):
-    # 这个类也没什么可以定义的……
 
 
 
