@@ -70,6 +70,8 @@ class ReplayConfig:
     dataset: DatasetReplayConfig
     # Use vocal synthesis to read events.
     play_sounds: bool = False
+    # skip设置
+    skip_step: int=1
 
 
 @draccus.wrap()
@@ -81,20 +83,67 @@ def replay(cfg: ReplayConfig):
     dataset = LeRobotDataset(cfg.dataset.repo_id, root=cfg.dataset.root, episodes=[cfg.dataset.episode])
     actions = dataset.hf_dataset.select_columns("action")
     robot.connect()
+    # 前多少次计数
+    """
+    replay的时候可以跳步
+    """
+    skip_step = cfg.skip_step
+    warmup_merge_steps = 5
+    send_count = 0
+    frame_idx = 0
 
     log_say("Replaying episode", cfg.play_sounds, blocking=True)
-    for idx in range(dataset.num_frames):
+    # for idx in range(dataset.num_frames):
+    #     start_episode_t = time.perf_counter()
+
+    #     action_array = actions[idx]["action"]
+    #     action = {}
+    #     for i, name in enumerate(dataset.features["action"]["names"]):
+    #         action[name] = action_array[i]
+
+    #     robot.send_action(action)
+
+    #     dt_s = time.perf_counter() - start_episode_t
+    #     busy_wait(1 / dataset.fps - dt_s)
+
+    # robot.disconnect()
+
+    while frame_idx < dataset.num_frames:
         start_episode_t = time.perf_counter()
 
-        action_array = actions[idx]["action"]
-        action = {}
-        for i, name in enumerate(dataset.features["action"]["names"]):
-            action[name] = action_array[i]
+        if skip_step > 1 and send_count < warmup_merge_steps:
+            # Warmup 合并阶段：取 skip_step 个 action 加权平均
+            merged_action = {}
+            valid_skip = min(skip_step, dataset.num_frames - frame_idx)
+            weight = 1.0 / valid_skip
 
-        robot.send_action(action)
+            # 初始化 merged_action
+            for name in dataset.features["action"]["names"]:
+                merged_action[name] = 0.0
 
+            for offset in range(valid_skip):
+                action_array = actions[frame_idx + offset]["action"]
+                for i, name in enumerate(dataset.features["action"]["names"]):
+                    merged_action[name] += action_array[i] * weight
+
+            frame_idx += valid_skip
+            send_count += 1
+            robot.send_action(merged_action)
+
+        else:
+            print("正常")
+            # 正常逐帧
+            action_array = actions[frame_idx]["action"]
+            action = {}
+            for i, name in enumerate(dataset.features["action"]["names"]):
+                action[name] = action_array[i]
+
+            robot.send_action(action)
+            frame_idx += 1
+
+        # 控制帧率
         dt_s = time.perf_counter() - start_episode_t
-        busy_wait(1 / dataset.fps - dt_s)
+        busy_wait(3 / dataset.fps - dt_s)
 
     robot.disconnect()
 

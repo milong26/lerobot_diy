@@ -378,6 +378,10 @@ class SmolVLAPolicy(PreTrainedPolicy):
         self.language_tokenizer = AutoProcessor.from_pretrained(self.config.vlm_model_name, local_files_only=True).tokenizer
         self.model = VLAFlowMatching(config)
         self.reset()
+        # 为了能more step
+        self._warmup_mode = True
+        self._warmup_counter = 0
+        self._warmup_total_steps = 5  # 可以设成 config 参数
 
     def reset(self):
         """This should be called whenever the environment is reset."""
@@ -482,7 +486,41 @@ class SmolVLAPolicy(PreTrainedPolicy):
             # effectively has shape (n_action_steps, batch_size, *), hence the transpose.
             self._queues[ACTION].extend(actions.transpose(0, 1)[: self.config.n_action_steps])
 
+        """
+        增加跳步
+        """
+
+        # --- Warmup 阶段逻辑 ---
+        if self._in_warmup:
+            # 先搞一次走5步，先5次
+            warmup_n = self._warmup_steps
+
+            # 如果 queue 中不足 N 个，就提前补充
+            while len(self._queues[ACTION]) < warmup_n:
+                actions = self._get_action_chunk(batch, noise)
+                self._queues[ACTION].extend(actions.transpose(0, 1)[: self.config.n_action_steps])
+
+            # 取出 N 个动作做加权平均
+            action_list = [self._queues[ACTION].popleft() for _ in range(warmup_n)]  # list of [B, D]
+            actions = torch.stack(action_list, dim=1)  # [B, N, D]
+
+            # 加权平均
+            weights = torch.linspace(1.0, 0.5, steps=warmup_n, device=actions.device)
+            weights = weights / weights.sum()
+            weights = weights.view(1, -1, 1)  # [1, N, 1]
+
+            weighted_action = (actions * weights).sum(dim=1)  # [B, D]
+
+            self._warmup_counter += 1
+            if self._warmup_counter >= self._warmup_steps:
+                self._in_warmup = False
+            print(self._warmup_counter,"次数，剩下queue",len(self._queues[ACTION]))
+            return weighted_action
+
+        # --- 正常阶段：一次只取一个动作 ---
         return self._queues[ACTION].popleft()
+
+        # return self._queues[ACTION].popleft()
 
     def forward(self, batch: dict[str, Tensor], noise=None, time=None) -> dict[str, Tensor]:
         """Do a full training forward pass to compute the loss"""
