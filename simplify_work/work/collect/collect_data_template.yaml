@@ -13,7 +13,7 @@ robot:
       width: 640
       height: 480
       fps: 30
-      use_depth: false
+      use_depth: true
     wrist:
       type: opencv
       index_or_path: 6
@@ -34,7 +34,7 @@ teleop:
 
 
 # 个性化
-display_data: false
+display_data: true
 
 dataset:
   repo_id: test/collect_1
