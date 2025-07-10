@@ -1,7 +1,10 @@
-# CUDA_VISIBLE_DEVICES=1 HF_HUB_OFFLINE=1 python lerobot/scripts/train.py --config_path=simplify_work/work/fine_tune_0709_first50.yaml
+# CUDA_VISIBLE_DEVICES=3 HF_HUB_OFFLINE=1 PYTHONPATH=src python -m lerobot.scripts.train --config_path=simplify_work/work/train/fine_tune_0709_first50.yaml --policy.path=models/forsmolvla/smolvla_base --policy.repo_id=lerobot/smolvla_base
 # 用的inputfeature有什么？
-policy:
-  path: models/forsmolvla/smolvla_base
+
+# 改用这个
+# nohup env CUDA_VISIBLE_DEVICES=3 HF_HUB_OFFLINE=1 PYTHONPATH=src   python -m lerobot.scripts.train   --config_path=simplify_work/work/train/fine_tune_0709_first50.yaml   --policy.path=models/forsmolvla/smolvla_base   --policy.repo_id=lerobot/smolvla_base   > train_50.log 2>&1 &
+# policy:
+#   path: models/forsmolvla/smolvla_base
 
 dataset:
   repo_id: lerobot/svla_so101_pickplace
