@@ -375,13 +375,15 @@ class SmolVLAPolicy(PreTrainedPolicy):
 
         # self.language_tokenizer = AutoProcessor.from_pretrained(self.config.vlm_model_name).tokenizer
 
+
         self.language_tokenizer = AutoProcessor.from_pretrained(self.config.vlm_model_name, local_files_only=True).tokenizer
+        # self.language_tokenizer = AutoProcessor.from_pretrained("models/forsmolvla/HuggingFaceTB/SmolVLM2-500M-Video-Instruct", local_files_only=True).tokenizer
         self.model = VLAFlowMatching(config)
         self.reset()
         # 为了能more step
-        self._warmup_mode = True
+        self._warmup_steps = 7  # 或从 config 中读取，可改
         self._warmup_counter = 0
-        self._warmup_total_steps = 5  # 可以设成 config 参数
+        self._in_warmup = True
 
     def reset(self):
         """This should be called whenever the environment is reset."""
@@ -518,6 +520,7 @@ class SmolVLAPolicy(PreTrainedPolicy):
             return weighted_action
 
         # --- 正常阶段：一次只取一个动作 ---
+        print("正常剩下queue",len(self._queues[ACTION]))
         return self._queues[ACTION].popleft()
 
         # return self._queues[ACTION].popleft()
