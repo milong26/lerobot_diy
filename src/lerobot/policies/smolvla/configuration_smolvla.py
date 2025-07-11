@@ -84,7 +84,8 @@ class SmolVLAConfig(PreTrainedConfig):
 
     # vlm_model_name: str = "HuggingFaceTB/SmolVLM2-500M-Video-Instruct"  # Select the VLM backbone.
     # 直接把这个vlm_model_name改成local
-    vlm_model_name:str="models/forsmolvla/HuggingFaceTB/SmolVLM2-500M-Video-Instruct"
+    vlm_model_name: str = "models/forsmolvla/HuggingFaceTB/SmolVLM2-500M-Video-Instruct"
+
 
     # 不方便直接下载所以改成path
     # 目录在lerobot同级
@@ -119,6 +120,7 @@ class SmolVLAConfig(PreTrainedConfig):
             raise NotImplementedError(
                 "`use_delta_joint_actions_aloha` is used by smolvla for aloha real models. It is not ported yet in LeRobot."
             )
+        print("啊啊啊?",self.vlm_model_name)
         # 检查backbone的目录对不对
         # import os
         # model_path = os.path.abspath(os.path.join("models/forsmolvla/", self.vlm_model_name))
