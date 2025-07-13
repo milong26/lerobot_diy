@@ -1,0 +1,53 @@
+# 运行指令提示
+# conda activate lerobot
+# 检查端口： python src/lerobot/find_port.py
+# sudo chmod 666 /dev/ttyACM0
+# PYTHONPATH=src python -m lerobot.record --config_path=simplify_work/work/evaluate_smolvla_base.yaml
+# HF_HUB_OFFLINE=1 PYTHONPATH=src python -m lerobot.record --config_path=simplify_work/work/eavluate/evaluate_0709_skip.yaml --policy.path=/home/qwe/.cache/huggingface/lerobot/trained_baseline_locally/0709test4kstepfor100/last/pretrained_model/
+
+server_address: 10.10.1.35:9000
+
+robot:
+  type: so100_follower
+  port: /dev/ttyACM0
+  id: congbi
+  cameras:
+    side:
+      type: intelrealsense
+      serial_number_or_name: 806312060427
+      width: 640
+      height: 480
+      fps: 30
+      use_depth: false
+    wrist:
+      type: opencv
+      index_or_path: 6
+      width: 640
+      height: 480
+      fps: 30
+  # sensors:
+  #   wrist:
+  #     type: WowForceSensor
+  #     port: /dev/ttyACM2
+  #     num_mags: 5
+
+
+task: "pick up the pyramid-shaped sachet and place it into the box."
+policy_type: smolvla
+pretrained_name_or_path: outputs/train/0709_first50/checkpoints/last
+policy_device: cuda
+
+actions_per_chunk: 50
+chunk_size_threshold: 0.5
+aggregate_fn_name: weighted_average
+debug_visualize_queue_size: true
+
+# 个性化
+display_data: false
+
+dataset:
+  repo_id: 0713eval/eval_firts50_baseline
+  num_episodes: 1
+  episode_time_s: 60
+  push_to_hub: false
+  reset_time_s: 0
