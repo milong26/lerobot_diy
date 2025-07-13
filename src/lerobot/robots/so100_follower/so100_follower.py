@@ -215,7 +215,7 @@ class SO100Follower(Robot):
         for cam_key, cam in self.cameras.items():
             start = time.perf_counter()
 
-            if type(cam) is RealSenseCamera:
+            if type(cam) is RealSenseCamera and cam.use_depth:
                 color, depth = cam.async_read_combined()
                 obs_dict[cam_key]=color
                 if depth is not None:
