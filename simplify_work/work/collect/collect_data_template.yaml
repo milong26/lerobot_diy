@@ -37,7 +37,7 @@ teleop:
 display_data: true
 
 dataset:
-  repo_id: test/collect_1
+  repo_id: test/collect_2
   num_episodes: 1
   single_task: "pick up the orange tomato and place it into the box."
   episode_time_s: 15

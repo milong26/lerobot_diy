@@ -59,15 +59,30 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # 为了filter raw dataset
 class FilteredBatchLoader:
-    def __init__(self, dataloader, exclude_keys: list):
+    def __init__(self, dataloader, exclude_keys: list, obj_detector=None):
         self.dataloader = dataloader
         self.exclude_keys = set(exclude_keys)
+        self.obj_detector = obj_detector  # 新增
 
     def __iter__(self):
         for batch in self.dataloader:
-            yield {
-                k: v for k, v in batch.items() if k not in self.exclude_keys
-            }
+            # 先过滤掉无用字段
+            filtered_batch = {k: v for k, v in batch.items() if k not in self.exclude_keys}
+
+            # 如果有 obj_detector，就处理每张图
+            if self.obj_detector is not None:
+                # images都是tensor格式的
+                images = filtered_batch["observation.images.side"]            # [B, C, H, W]
+                depths = filtered_batch["observation.images.side_depth"]      # [B, 1, H, W]
+                tasks = filtered_batch["task"]                                 # list[str] or tensor of strings
+
+
+
+                # new_tasks: list[str]，和原始 tasks 长度一致
+                new_tasks = self.obj_detector.add_depth_info_to_task(images, depths, tasks)
+                filtered_batch["task"] = new_tasks  # 覆盖原 task
+
+            yield filtered_batch
 
     def __len__(self):
         return len(self.dataloader)
@@ -183,7 +198,6 @@ def train(cfg: TrainPipelineConfig):
     logging.info(f"{num_learnable_params=} ({format_big_number(num_learnable_params)})")
     logging.info(f"{num_total_params=} ({format_big_number(num_total_params)})")
 
-    # create dataloader for offline training
     if hasattr(cfg.policy, "drop_n_last_frames"):
         shuffle = False
         sampler = EpisodeAwareSampler(
@@ -210,14 +224,22 @@ def train(cfg: TrainPipelineConfig):
         exclude_features += ["observation.images.side_depth", "observation.images.side_depth_is_pad"]
     if not cfg.use_force:
         exclude_features += ["observation.force", "observation.force_is_pad"]
-    if not cfg.use_language_tip:
-        # 加语言引导的
-        pass
+    obj_detector = None
+    if cfg.use_language_tip:
+        from simplify_work.obj_dection.detector_api import GroundingDINOProcessor
+        obj_detector = GroundingDINOProcessor(
+            text_prompt="The Gripper And The Pyramid-Shaped Sachet",
+            device=device.type,
+        )
 
-    #  包装 dataloader
-    dataloader = FilteredBatchLoader(raw_dataloader, exclude_features)
+    # 包装 dataloader
+    dataloader = FilteredBatchLoader(raw_dataloader, exclude_features, obj_detector=obj_detector)
     peek_batch = next(iter(dataloader))
     print("真正训练的时候甬道的feature：", list(peek_batch.keys()))
+    print("任务 task 示例：",peek_batch["task"])
+    raise KeyError("task搞定")
+
+
     dl_iter = cycle(dataloader)
 
     policy.train()

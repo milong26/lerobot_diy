@@ -75,7 +75,6 @@ from lerobot.datasets.video_utils import (
 
 CODEBASE_VERSION = "v2.1"
 
-
 class LeRobotDatasetMetadata:
     def __init__(
         self,

@@ -160,12 +160,15 @@ class PreTrainedConfig(draccus.ChoiceRegistry, HubMixin, abc.ABC):
     ) -> T:
         model_id = str(pretrained_name_or_path)
         config_file: str | None = None
+        print(model_id)
         if Path(model_id).is_dir():
+            print("path is dir")
             if CONFIG_NAME in os.listdir(model_id):
                 config_file = os.path.join(model_id, CONFIG_NAME)
             else:
                 print(f"{CONFIG_NAME} not found in {Path(model_id).resolve()}")
         else:
+            raise KeyError("本地没有模型文件")
             try:
                 config_file = hf_hub_download(
                     repo_id=model_id,

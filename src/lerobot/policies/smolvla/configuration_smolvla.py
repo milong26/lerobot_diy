@@ -120,7 +120,6 @@ class SmolVLAConfig(PreTrainedConfig):
             raise NotImplementedError(
                 "`use_delta_joint_actions_aloha` is used by smolvla for aloha real models. It is not ported yet in LeRobot."
             )
-        print("啊啊啊?",self.vlm_model_name)
         # 检查backbone的目录对不对
         # import os
         # model_path = os.path.abspath(os.path.join("models/forsmolvla/", self.vlm_model_name))
