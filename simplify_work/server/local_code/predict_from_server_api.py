@@ -18,7 +18,7 @@ import json
 import torch
 import numpy as np
 import threading
-from image_sender import start_image_sender, image_queue, stop_image_sender
+from server.local_code.image_sender import start_image_sender, image_queue, stop_image_sender
 from queue import Queue
 
 server_ip = '10.10.1.35'

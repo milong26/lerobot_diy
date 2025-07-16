@@ -1,6 +1,6 @@
 import torch
 import time
-from predict_from_server_api import predict_from_server,shutdown_clients
+from server.local_code.predict_from_server_api import predict_from_server,shutdown_clients
 
 # 构造 observation
 observation = {

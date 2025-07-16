@@ -81,19 +81,19 @@ IS_LOCAL = os.environ.get("ENV", "") == "local"
 print(f"IS_LOCAL = {IS_LOCAL}")
 # 如果判断是本地的
 if IS_LOCAL:
-    # 服务器推理
-    import sys
+    # # 服务器推理
+    # import sys
 
-    # 获取该文件所在目录（control_utils.py）
-    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # # 获取该文件所在目录（control_utils.py）
+    # current_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # 找到 simplify_work/server/local_code 所在目录的绝对路径
-    predict_code_dir = os.path.abspath(os.path.join(current_dir, '../../../../../simplify_work/server/local_code'))
+    # # 找到 simplify_work/server/local_code 所在目录的绝对路径
+    # predict_code_dir = os.path.abspath(os.path.join(current_dir, '../../../../../../simplify_work/server/local_code'))
 
-    # 临时加入 Python 模块搜索路径
-    if predict_code_dir not in sys.path:
-        sys.path.insert(0, predict_code_dir)
-    from predict_from_server_api import predict_from_server
+    # # 临时加入 Python 模块搜索路径
+    # if predict_code_dir not in sys.path:
+    #     sys.path.insert(0, predict_code_dir)
+    from server.local_code.predict_from_server_api import predict_from_server
 
 
 # Matches ".soNNN", optionally followed by "-something", up to the "_buffer_" marker
@@ -375,7 +375,7 @@ class SmolVLAPolicy(PreTrainedPolicy):
 
         # self.language_tokenizer = AutoProcessor.from_pretrained(self.config.vlm_model_name).tokenizer
 
-
+        self.config.vlm_model_name="models/forsmolvla/HuggingFaceTB/SmolVLM2-500M-Video-Instruct"
         self.language_tokenizer = AutoProcessor.from_pretrained(self.config.vlm_model_name, local_files_only=True).tokenizer
         # self.language_tokenizer = AutoProcessor.from_pretrained("models/forsmolvla/HuggingFaceTB/SmolVLM2-500M-Video-Instruct", local_files_only=True).tokenizer
         self.model = VLAFlowMatching(config)
@@ -383,7 +383,7 @@ class SmolVLAPolicy(PreTrainedPolicy):
         # 为了能more step
         self._warmup_steps = 7  # 或从 config 中读取，可改
         self._warmup_counter = 0
-        self._in_warmup = True
+        self._in_warmup = False
 
     def reset(self):
         """This should be called whenever the environment is reset."""

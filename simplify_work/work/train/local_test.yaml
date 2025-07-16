@@ -1,0 +1,20 @@
+
+dataset:
+  repo_id: lerobot/svla_so101_pickplace
+  root: /home/qwe/.cache/huggingface/lerobot/0708work/pickplace_50
+
+batch_size: 16
+steps: 2000
+output_dir: outputs/train/test_no_use
+job_name: test
+wandb:
+  enable: false
+
+policy:
+  device: cpu
+  repo_id: lerobot/smolvla_base
+  type: smolvla
+
+use_depth_image: true
+use_force: false
+use_language_tip: true
