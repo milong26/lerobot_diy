@@ -26,19 +26,13 @@ import subprocess
 
 import subprocess
 import sys
+print(sys.version)
+print(sys.executable)
+print(f"PYTHON PATH: {sys.executable}")
 
-def install_torch():
-    try:
-        import torch
-    except ImportError:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "torch"])
 
-# Call the function to ensure torch is installed
-install_torch()
-
-import torch
 from setuptools import find_packages, setup
-from torch.utils.cpp_extension import CUDA_HOME, CppExtension, CUDAExtension
+
 
 # groundingdino version info
 version = "0.1.0"
@@ -61,11 +55,12 @@ def write_version_file():
 
 
 requirements = ["torch", "torchvision"]
-
-torch_ver = [int(x) for x in torch.__version__.split(".")[:2]]
+torch_version = "2.6.0+cu118"
+torch_ver = [int(x) for x in torch_version.split(".")[:2]]
 
 
 def get_extensions():
+
     this_dir = os.path.dirname(os.path.abspath(__file__))
     extensions_dir = os.path.join(this_dir, "groundingdino", "models", "GroundingDINO", "csrc")
 
@@ -76,14 +71,15 @@ def get_extensions():
     )
 
     sources = [main_source] + sources
+    from torch.utils.cpp_extension import CUDA_HOME, CppExtension, CUDAExtension
 
     extension = CppExtension
 
     extra_compile_args = {"cxx": []}
     define_macros = []
 
-    if CUDA_HOME is not None and (torch.cuda.is_available() or "TORCH_CUDA_ARCH_LIST" in os.environ):
-        print("Compiling with CUDA")
+    if CUDA_HOME is not None and  "TORCH_CUDA_ARCH_LIST" in os.environ:
+        print("Compiling with CUDA cuda能用!")
         extension = CUDAExtension
         sources += source_cuda
         define_macros += [("WITH_CUDA", None)]
@@ -194,12 +190,13 @@ def parse_requirements(fname="requirements.txt", with_version=True):
 
 
 if __name__ == "__main__":
-    print(f"Building wheel {package_name}-{version}")
 
+    print(f"Building wheel {package_name}-{version}")
     with open("LICENSE", "r", encoding="utf-8") as f:
         license = f.read()
 
     write_version_file()
+    from torch.utils.cpp_extension import BuildExtension
 
     setup(
         name="groundingdino",
@@ -216,5 +213,30 @@ if __name__ == "__main__":
             )
         ),
         ext_modules=get_extensions(),
-        cmdclass={"build_ext": torch.utils.cpp_extension.BuildExtension},
+        cmdclass={"build_ext": BuildExtension},
     )
+
+        # 新增模块验证 - 安装后立即检查
+    print("\n" + "="*50)
+    try:
+        from groundingdino import _C
+        print("✅ CUDA 扩展安装成功！")
+        print(f"模块位置: {_C.__file__}")
+    except ImportError:
+        print("❌ 错误：CUDA 扩展未成功安装！")
+        print("可能原因：")
+        print("1. 编译失败但未报错")
+        print("2. 安装路径与 Python 环境不匹配")
+        print("3. 文件权限问题")
+        
+        # 列出已安装文件验证
+        print("\n已安装文件列表:")
+        so_files = list(glob.glob('build/**/*.so', recursive=True))
+        so_files += list(glob.glob('build/**/*.pyd', recursive=True))
+        
+        if so_files:
+            for f in so_files:
+                print(f" - {f}")
+        else:
+            print("⚠️ 未找到任何编译的扩展文件")
+    print("="*50 + "\n")

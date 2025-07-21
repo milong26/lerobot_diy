@@ -18,6 +18,7 @@ def load_and_warmup_model():
     observation = {
         "observation.state": np.random.rand(6).astype(np.float32),  # shape: [6]
         "observation.images.side": (np.random.rand(480, 640, 3) * 255).astype(np.uint8),  # shape: [480, 640, 3]
+        "observation.images.side_depth": (np.random.rand(480, 640, 3) * 255).astype(np.uint8),  # shape: [480, 640, 3]
         "observation.images.wrist": (np.random.rand(480, 640, 3) * 255).astype(np.uint8),  # shape: [480, 640, 3]
         "task": "pick up the orange tomato and place it into the box.",  # string
         "robot_type": "so100_follower"  # string
@@ -26,7 +27,9 @@ def load_and_warmup_model():
     # optional: 添加 images 列表（如果模型需要）
     observation["observation.images"] = [
         observation["observation.images.side"],
+        observation["observation.images.side_depth"],
         observation["observation.images.wrist"]
+
     ]
     
     observation = copy(observation)

@@ -35,12 +35,12 @@ def load_policy():
     
 
 
-    pretrained_path = Path("outputs/train/pickplace_baseline/checkpoints/last/pretrained_model")
+    pretrained_path = Path("outputs/train/0709_first100_depth/checkpoints/last/pretrained_model")
 
     input_features = {
         "observation.state": PolicyFeature(type=FeatureType.STATE, shape=(6,)),
         "observation.images.side": PolicyFeature(type=FeatureType.VISUAL, shape=(3, 480, 640)),
-        # "observation.images.sceneDepth": PolicyFeature(type=FeatureType.VISUAL, shape=(3, 480, 640)),
+        "observation.images.side_depth": PolicyFeature(type=FeatureType.VISUAL, shape=(3, 480, 640)),
         "observation.images.wrist": PolicyFeature(type=FeatureType.VISUAL, shape=(3, 480, 640)),
         # "observation.force": PolicyFeature(type=FeatureType.FORCE, shape=(15,)),
     }

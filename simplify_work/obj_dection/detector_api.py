@@ -1,3 +1,4 @@
+import math
 import os
 import sys
 import cv2
@@ -211,5 +212,26 @@ class GroundingDINOProcessor:
             
 
         return points_3d
+    
+    def count_distance(self,rgb_batch,depth_batch):
+        for rgb, depth in zip(rgb_batch, depth_batch):
+            # 获取两个目标的深度值
+            points_3d = self.process_sample(rgb, depth)  # 返回两个 float
+
+            # 用深度返回物体的3维坐标
+
+            valid_points = [p for p in points_3d if p is not None]
+
+            if len(valid_points) >= 2:
+                a = valid_points[0]
+                b = valid_points[1]
+                distance = math.sqrt((a[0] - b[0])**2 + 
+                        (a[1] - b[1])**2 + 
+                        (a[2] - b[2])**2)
+            else:
+                distance = None
+        return distance
+        
+
 
 
