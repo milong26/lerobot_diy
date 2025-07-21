@@ -7,28 +7,34 @@ import threading
 image_buffer = {}
 lock = threading.Lock()
 
+
+def recv_all(sock, num_bytes):
+    """确保从 socket 接收完整 num_bytes 字节"""
+    buffer = b''
+    while len(buffer) < num_bytes:
+        packet = sock.recv(num_bytes - len(buffer))
+        if not packet:
+            raise ConnectionError("Socket closed while receiving data.")
+        buffer += packet
+    return buffer
+
+
 def handle_image_connection(conn):
     while True:
         try:
-            # 读取 header 长度
-            header_len_bytes = conn.recv(4)
-            if not header_len_bytes:
-                break
+            # 确保完整读取 header_len（4字节）
+            header_len_bytes = recv_all(conn, 4)
             header_len = struct.unpack('I', header_len_bytes)[0]
 
-            # 读取 header
-            header = conn.recv(header_len).decode('utf-8')
+            # 确保完整读取 header
+            header_bytes = recv_all(conn, header_len)
+            header = header_bytes.decode('utf-8')
             cam_name, shape_str = header.split(':')
             shape = tuple(map(int, shape_str.strip('()').split(',')))
 
             # 接收图像数据
             num_bytes = np.prod(shape) * 4  # float32
-            data = b''
-            while len(data) < num_bytes:
-                packet = conn.recv(num_bytes - len(data))
-                if not packet:
-                    break
-                data += packet
+            data = recv_all(conn, num_bytes)
 
             img = np.frombuffer(data, dtype=np.float32).reshape(shape)
 
@@ -40,6 +46,7 @@ def handle_image_connection(conn):
             break
 
     conn.close()
+
 
 def start_image_server(host='0.0.0.0', port=9100):
     threading.Thread(target=_start_server_thread, args=(host, port), daemon=True).start()

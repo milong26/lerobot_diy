@@ -171,32 +171,32 @@ def train(cfg: TrainPipelineConfig):
         logging.info("Creating env")
         eval_env = make_env(cfg.env, n_envs=cfg.eval.batch_size, use_async_envs=cfg.eval.use_async_envs)
 
-    logging.info("Creating policy")
-    policy = make_policy(
-        cfg=cfg.policy,
-        ds_meta=dataset.meta,
-    )
+    # logging.info("Creating policy")
+    # policy = make_policy(
+    #     cfg=cfg.policy,
+    #     ds_meta=dataset.meta,
+    # )
 
-    logging.info("Creating optimizer and scheduler")
-    optimizer, lr_scheduler = make_optimizer_and_scheduler(cfg, policy)
-    grad_scaler = GradScaler(device.type, enabled=cfg.policy.use_amp)
+    # logging.info("Creating optimizer and scheduler")
+    # optimizer, lr_scheduler = make_optimizer_and_scheduler(cfg, policy)
+    # grad_scaler = GradScaler(device.type, enabled=cfg.policy.use_amp)
 
-    step = 0  # number of policy updates (forward + backward + optim)
+    # step = 0  # number of policy updates (forward + backward + optim)
 
-    if cfg.resume:
-        step, optimizer, lr_scheduler = load_training_state(cfg.checkpoint_path, optimizer, lr_scheduler)
+    # if cfg.resume:
+    #     step, optimizer, lr_scheduler = load_training_state(cfg.checkpoint_path, optimizer, lr_scheduler)
 
-    num_learnable_params = sum(p.numel() for p in policy.parameters() if p.requires_grad)
-    num_total_params = sum(p.numel() for p in policy.parameters())
+    # num_learnable_params = sum(p.numel() for p in policy.parameters() if p.requires_grad)
+    # num_total_params = sum(p.numel() for p in policy.parameters())
 
-    logging.info(colored("Output dir:", "yellow", attrs=["bold"]) + f" {cfg.output_dir}")
-    if cfg.env is not None:
-        logging.info(f"{cfg.env.task=}")
-    logging.info(f"{cfg.steps=} ({format_big_number(cfg.steps)})")
-    logging.info(f"{dataset.num_frames=} ({format_big_number(dataset.num_frames)})")
-    logging.info(f"{dataset.num_episodes=}")
-    logging.info(f"{num_learnable_params=} ({format_big_number(num_learnable_params)})")
-    logging.info(f"{num_total_params=} ({format_big_number(num_total_params)})")
+    # logging.info(colored("Output dir:", "yellow", attrs=["bold"]) + f" {cfg.output_dir}")
+    # if cfg.env is not None:
+    #     logging.info(f"{cfg.env.task=}")
+    # logging.info(f"{cfg.steps=} ({format_big_number(cfg.steps)})")
+    # logging.info(f"{dataset.num_frames=} ({format_big_number(dataset.num_frames)})")
+    # logging.info(f"{dataset.num_episodes=}")
+    # logging.info(f"{num_learnable_params=} ({format_big_number(num_learnable_params)})")
+    # logging.info(f"{num_total_params=} ({format_big_number(num_total_params)})")
 
     if hasattr(cfg.policy, "drop_n_last_frames"):
         shuffle = False
@@ -229,7 +229,7 @@ def train(cfg: TrainPipelineConfig):
         from simplify_work.obj_dection.detector_api import GroundingDINOProcessor
         obj_detector = GroundingDINOProcessor(
             text_prompt="The Gripper And The Pyramid-Shaped Sachet",
-            device=device.type,
+            device="cpu",
         )
 
     # 包装 dataloader

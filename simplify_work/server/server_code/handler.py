@@ -61,7 +61,7 @@ def handle_data_connection(conn, model):
                 observation[key] = val
             # 每个episode才reset一次，但是reset只是跟queue有关
             # model.reset() 
-            images = wait_for_images(['side', 'wrist'], timeout=2.0)
+            images = wait_for_images(['side', 'side_depth','wrist'], timeout=2.0)
             if images is None:
                 raise KeyError("图片没传送过来")
             else:
@@ -73,8 +73,8 @@ def handle_data_connection(conn, model):
                     observation[key] = np_img
             observation["observation.images"] = [
                 observation["observation.images.side"],
+                observation["observation.images.side_depth"],
                 observation["observation.images.wrist"],
-                # batch["observation.images.sideDepth"],
             ]
             # 需要确保这里的observation格式一致
             batch=preprocess_observation_server(observation=observation)

@@ -1,6 +1,6 @@
 name: dino
 channels:
-  - pytorch
+  # - pytorch
   - nvidia
   - conda-forge
   - defaults
@@ -190,9 +190,9 @@ dependencies:
   - python-tzdata=2023.3=pyhd8ed1ab_0
   - python-xxhash=3.3.0=py39ha55989b_1
   - python_abi=3.9=4_cp39
-  - pytorch=2.0.1=py3.9_cuda11.8_cudnn8_0
-  - pytorch-cuda=11.8=h24eeafa_5
-  - pytorch-mutex=1.0=cuda
+  # - pytorch=2.0.1=py3.9_cuda11.8_cudnn8_0
+  # - pytorch-cuda=11.8=h24eeafa_5
+  # - pytorch-mutex=1.0=cuda
   - pytz=2023.3.post1=pyhd8ed1ab_0
   - pywin32=305=py39h2bbff1b_0
   - pyyaml=6.0.1=py39ha55989b_1
@@ -243,6 +243,6 @@ dependencies:
   - pip:
       - opencv-python==4.8.0.76
       - supervision==0.6.0
-      - torchaudio==2.0.2
-      - torchvision==0.15.2
+      # - torchaudio==2.0.2
+      # - torchvision==0.15.2
 prefix: C:\Users\Makoto\miniconda3\envs\dino

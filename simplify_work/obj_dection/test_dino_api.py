@@ -24,7 +24,8 @@ task_batch = ["put the gripper near the sachet"]  # 示例任务描述
 # Step 4: 初始化 GroundingDINOProcessor
 processor = GroundingDINOProcessor(
     text_prompt="The Gripper And The Pyramid-Shaped Sachet",
-    device="cuda" if torch.cuda.is_available() else "cpu",
+    # device="cuda" if torch.cuda.is_available() else "cpu",
+    device="cpu"
 )
 
 # Step 5: 调用函数测试

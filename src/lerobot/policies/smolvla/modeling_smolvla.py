@@ -381,15 +381,26 @@ class SmolVLAPolicy(PreTrainedPolicy):
         self.model = VLAFlowMatching(config)
         self.reset()
         # 为了能more step
-        self._warmup_steps = 7  # 或从 config 中读取，可改
-        self._warmup_counter = 0
+        self._warmup_steps = 5  # 或从 config 中读取，可改
         self._in_warmup = False
+        if self._in_warmup:
+            from simplify_work.obj_dection.detector_api import GroundingDINOProcessor
+            self.obj_detector = GroundingDINOProcessor(
+                text_prompt="The Gripper And The Pyramid-Shaped Sachet",
+                device="cpu",
+            )
+            print("objmodel创建")
+        else: 
+            self.obj_detector=None
+
 
     def reset(self):
         """This should be called whenever the environment is reset."""
         self._queues = {
             ACTION: deque(maxlen=self.config.n_action_steps),
         }
+
+
 
     # HACK(aliberts, danaaubakirova): we overwrite this classmethod here to fix smolVLA-specific issues
     @classmethod
@@ -486,6 +497,7 @@ class SmolVLAPolicy(PreTrainedPolicy):
 
             # `self.predict_action_chunk` returns a (batch_size, n_action_steps, action_dim) tensor, but the queue
             # effectively has shape (n_action_steps, batch_size, *), hence the transpose.
+            print("no data,计算")
             self._queues[ACTION].extend(actions.transpose(0, 1)[: self.config.n_action_steps])
 
         """
@@ -494,8 +506,16 @@ class SmolVLAPolicy(PreTrainedPolicy):
 
         # --- Warmup 阶段逻辑 ---
         if self._in_warmup:
-            # 先搞一次走5步，先5次
-            warmup_n = self._warmup_steps
+            # 获取目标距离
+            distance = self.obj_detector.count_distance(batch["observation.images.side"],batch["observation.images.side_depth"])
+
+            # 根据距离设置 warmup 步数
+            if distance >= 2:
+                warmup_n = 5  # 区间 A: 远距离，执行 5 步
+            elif distance >= 1:
+                warmup_n = 3  # 区间 B: 中距离，执行 3 步
+            else:
+                warmup_n = 1  # 区间 C: 近距离，执行 1 步
 
             # 如果 queue 中不足 N 个，就提前补充
             while len(self._queues[ACTION]) < warmup_n:
@@ -503,7 +523,7 @@ class SmolVLAPolicy(PreTrainedPolicy):
                 self._queues[ACTION].extend(actions.transpose(0, 1)[: self.config.n_action_steps])
 
             # 取出 N 个动作做加权平均
-            action_list = [self._queues[ACTION].popleft() for _ in range(warmup_n)]  # list of [B, D]
+            action_list = [self._queues[ACTION].popleft() for _ in range(warmup_n)]
             actions = torch.stack(action_list, dim=1)  # [B, N, D]
 
             # 加权平均
@@ -512,18 +532,10 @@ class SmolVLAPolicy(PreTrainedPolicy):
             weights = weights.view(1, -1, 1)  # [1, N, 1]
 
             weighted_action = (actions * weights).sum(dim=1)  # [B, D]
-
-            self._warmup_counter += 1
-            if self._warmup_counter >= self._warmup_steps:
-                self._in_warmup = False
-            print(self._warmup_counter,"次数，剩下queue",len(self._queues[ACTION]))
+            print(f"[Warmup] 距离: {distance:.3f}, 动作步数: {warmup_n},  剩余queue: {len(self._queues[ACTION])}")
             return weighted_action
-
-        # --- 正常阶段：一次只取一个动作 ---
-        print("正常剩下queue",len(self._queues[ACTION]))
+        print(f"走一步,剩余queue: {len(self._queues[ACTION])}")
         return self._queues[ACTION].popleft()
-
-        # return self._queues[ACTION].popleft()
 
     def forward(self, batch: dict[str, Tensor], noise=None, time=None) -> dict[str, Tensor]:
         """Do a full training forward pass to compute the loss"""
