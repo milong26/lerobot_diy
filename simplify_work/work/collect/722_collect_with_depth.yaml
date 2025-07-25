@@ -1,3 +1,10 @@
+
+# python -m lerobot.record --config_path=simplify_work/work/708_coolect_50data.yaml
+# sudo chmod 666 /dev/ttyACM0
+# visualize: python lerobot/scripts/visualize_dataset.py --repo-id=abaaba/hihi --root=/home/qwe/.cache/huggingface/lerobot/0708work/pickplace_50 --episode-index=0
+# 继续： --resume=True
+# 收集完之后发到服务器训练
+
 robot:
   type: so100_follower
   port: /dev/ttyACM0
@@ -12,7 +19,7 @@ robot:
       use_depth: true
     wrist:
       type: opencv
-      index_or_path: 6
+      index_or_path: 7
       width: 640
       height: 480
       fps: 30
@@ -33,9 +40,11 @@ teleop:
 display_data: false
 
 dataset:
-  repo_id: 0708work/pickplace
-  num_episodes: 20
+  repo_id: 0722work/pickplace_50
+  num_episodes: 8
   single_task: "pick up the pyramid-shaped sachet and place it into the box."
-  episode_time_s: 15
+  episode_time_s: 20
   push_to_hub: false
   reset_time_s: 1
+
+
