@@ -6,11 +6,11 @@
 
 dataset:
   repo_id: lerobot/svla_so101_pickplace
-  root: training_dataset/0709data_first100
+  root: /home/qwe/.cache/huggingface/lerobot/0722work/pickplace_50/
 
 batch_size: 64
 steps: 20000
-output_dir: outputs/train/0709_first100_depth
+output_dir: outputs/nottrain/0709_first100_depth
 job_name: training_pickplace_with_first100_depth
 wandb:
   enable: false

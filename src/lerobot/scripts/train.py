@@ -171,6 +171,7 @@ def train(cfg: TrainPipelineConfig):
         eval_env = make_env(cfg.env, n_envs=cfg.eval.batch_size, use_async_envs=cfg.eval.use_async_envs)
 
     # logging.info("Creating policy")
+    # logging.info("Creating policy")
     # policy = make_policy(
     #     cfg=cfg.policy,
     #     ds_meta=dataset.meta,
@@ -212,23 +213,88 @@ def train(cfg: TrainPipelineConfig):
         dataset,
         num_workers=cfg.num_workers,
         batch_size=cfg.batch_size,
-        shuffle=shuffle,
+        shuffle=False,
         sampler=sampler,
         pin_memory=device.type == "cuda",
         drop_last=False,
     )
     #  构造 exclude list
-    exclude_features = []
-    if not cfg.use_depth_image:
-        exclude_features += ["observation.images.side_depth", "observation.images.side_depth_is_pad"]
-    if not cfg.use_force:
-        exclude_features += ["observation.force", "observation.force_is_pad"]
-    obj_detector = None
-    if cfg.use_language_tip:
-        from simplify_work.obj_dection.obj_detector_api import YOLOProcessor
-        obj_detector = YOLOProcessor(
-            device="cuda",
-        )
+    # exclude_features = []
+    # if not cfg.use_depth_image:
+    #     exclude_features += ["observation.images.side_depth", "observation.images.side_depth_is_pad"]
+    # if not cfg.use_force:
+    #     exclude_features += ["observation.force", "observation.force_is_pad"]
+    # obj_detector = None
+    # if cfg.use_language_tip:
+    #     from simplify_work.obj_dection.detector_api import GroundingDINOProcessor
+    #     obj_detector = GroundingDINOProcessor(
+    #         text_prompt="The Gripper And The Pyramid-Shaped Sachet",
+    #         device=device.type,
+    #     )
+
+    """
+    保存图片到本地
+    """
+
+    # # 创建保存目录
+    # os.makedirs("outputs/check_channel", exist_ok=True)
+    # import numpy as np
+
+    # img_counter = 0
+    # for batch_idx, batch in enumerate(raw_dataloader):
+    #     if "observation.images.side_depth" in batch:
+    #         images = batch["observation.images.side_depth"]  # [B, C, H, W]
+            
+    #         for i in range(images.shape[0]):
+    #             img_tensor = images[i].detach().cpu()  # [C, H, W]
+                
+    #             # 1. 转换为NumPy数组并调整通道顺序 (C,H,W) -> (H,W,C)
+    #             if img_tensor.shape[0] == 3:  # RGB图像
+    #                 img_np = img_tensor.permute(1, 2, 0).numpy()
+    #             else:  # 灰度图像或特殊情况
+    #                 img_np = img_tensor.squeeze(0).numpy()  # [H, W]
+                
+    #             # 2. 检查并修复异常形状 (1,1,3)
+    #             if img_np.shape == (1, 1, 3):
+    #                 # 尝试恢复为原始尺寸（根据您的数据集实际情况修改尺寸）
+    #                 original_height, original_width = 224, 224  # 示例尺寸，需替换为真实值
+    #                 try:
+    #                     img_np = img_np.reshape(original_height, original_width, 3)
+    #                 except ValueError:
+    #                     logging.warning(f"无法重塑图像 {img_counter}，跳过")
+    #                     continue
+                
+    #             # 3. 归一化处理（支持float32和float64）
+    #             if img_np.dtype in [np.float32, np.float64]:
+    #                 if np.min(img_np) < 0:  # 值范围[-1,1]
+    #                     img_np = (img_np + 1) * 127.5
+    #                 elif np.max(img_np) <= 1.0:  # 值范围[0,1]
+    #                     img_np = img_np * 255
+    #                 # 确保值在0-255范围内
+    #                 img_np = np.clip(img_np, 0, 255)
+                
+    #             # 4. 转换为uint8（PIL要求的数据类型）
+    #             img_np = img_np.astype(np.uint8)
+                
+    #             # 5. 处理单通道灰度图
+    #             if img_np.ndim == 2 or (img_np.ndim == 3 and img_np.shape[2] == 1):
+    #                 img_np = img_np.squeeze()  # 移除单通道维度
+                
+    #             # 6. 保存为PNG
+    #             try:
+    #                 img_path = os.path.join("outputs/foryolo", f"{img_counter:06d}.png")
+    #                 Image.fromarray(img_np).save(img_path)
+    #                 img_counter += 1
+    #             except Exception as e:
+    #                 logging.error(f"保存图像失败: {e}, 形状: {img_np.shape}, 类型: {img_np.dtype}")
+    #                 continue
+                    
+    #     # 每10批次打印一次进度
+    #     if batch_idx % 10 == 0:
+    #         logging.info(f"已保存 {img_counter} 张图像...")
+    # raise KeyError("yolo准备工作")
+
+
 
 
     # 包装 dataloader
@@ -237,10 +303,64 @@ def train(cfg: TrainPipelineConfig):
     print("task示例",peek_batch["task"])
     # print("真正训练的时候甬道的feature：", list(peek_batch.keys()))
     raise KeyError("测试task")
+    print(peek_batch["observation.images.side_depth"].shape)
+    import cv2
+    import numpy as np
+    from PIL import Image
+    r_count=0
+    b_count=0
+    for i in range(64):
+        image_tensor=peek_batch["observation.images.side_depth"][i]
+        image_np = (image_tensor * 255).permute(1, 2, 0).cpu().numpy().astype(np.uint8)
+        rgb_image=image_np
+    #     # rgb_image 是形状为 (H, W, 3)，类型为 uint8，且通道顺序是 RGB
+    #     img = Image.fromarray(rgb_image)  # 自动识别为 RGB 模式
+    #     img.save(f"from_videos/{i}.png")
+    #     print(f"保存成功{i}.png")
+    # depth_encoded_path='frame_000000.png'
+    
+    # cv2_img = cv2.imread(depth_encoded_path, cv2.IMREAD_UNCHANGED)
+
+    # 通道调换顺序比较
+    # image_np_bgr = image_np[..., ::-1]  # RGB to BGR
+
+    # 直接比较差异
+    # 依次比较每个通道
+    
+
+        r = rgb_image[:, :, 0].astype(np.uint16)
+        g = rgb_image[:, :, 1].astype(np.uint16)
+        b = rgb_image[:, :, 2].astype(np.uint16)
+        print("r=",r[220][230])
+        print("g=",b[220][230])
+    # g_corrected = (g // 8) * 4  # 对低位进行4的倍数截断，抵消抖动
+    # depth_smooth = (r << 8) | g_corrected
+
+    # depth_uint16 =  g.astype(np.uint16)
+    # depth_r_only1 = (rgb_image[:, :, 0].astype(np.uint16)) << 8
 
 
+    # b, g, r = cv2.split(cv2_img)
+    # print(r[220][230])
+    # print(b[220][230])
+    # depth_uint162 = (r << 8) | g.astype(np.uint16)
+    # depth_r_only2 = (cv2_img[:, :, 0].astype(np.uint16)) << 8
+    # import numpy as np
 
+    # # 1. 绝对误差图
+    # diff = np.abs(cv2_img.astype(np.int16) - rgb_image.astype(np.int16))
+    # diff_gray = np.mean(diff, axis=2)  # 转灰度看差异强度
+    # abs_diff = np.abs(depth_uint16.astype(np.int32) - depth_uint162.astype(np.int32))
+    # abs_diffabs_diff_r_only=np.abs(depth_smooth.astype(np.int32) - depth_uint162.astype(np.int32))
 
+    # 2. 打印统计量
+    print("绝对误差统计:")
+    print(f"最大误差: {abs_diff.max()}")
+    print(f"平均误差: {abs_diff.mean():.2f}")
+    print(f"误差为0的像素占比: {(abs_diff == 0).sum() / abs_diff.size:.2%}")
+    print(f"误差大于10的像素占比: {(abs_diff > 10).sum() / abs_diff.size:.2%}")
+    
+    raise KeyError("stop")
 
     dl_iter = cycle(dataloader)
 
