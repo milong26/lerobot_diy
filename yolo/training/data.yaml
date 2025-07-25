@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['objects']
+
+roboflow:
+  workspace: lerobot-qwudf
+  project: my-first-project-os8tu
+  version: 2
+  license: Private
+  url: https://app.roboflow.com/lerobot-qwudf/my-first-project-os8tu/2

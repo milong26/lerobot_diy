@@ -66,6 +66,7 @@ class FilteredBatchLoader:
 
     def __iter__(self):
         for batch in self.dataloader:
+            # print("第几个batch")
             # 先过滤掉无用字段
             filtered_batch = {k: v for k, v in batch.items() if k not in self.exclude_keys}
 
@@ -75,12 +76,10 @@ class FilteredBatchLoader:
                 images = filtered_batch["observation.images.side"]            # [B, C, H, W]
                 depths = filtered_batch["observation.images.side_depth"]      # [B, 1, H, W]
                 tasks = filtered_batch["task"]                                 # list[str] or tensor of strings
-
-
-
                 # new_tasks: list[str]，和原始 tasks 长度一致
                 new_tasks = self.obj_detector.add_depth_info_to_task(images, depths, tasks)
                 filtered_batch["task"] = new_tasks  # 覆盖原 task
+                self.obj_detector.print_statistics()
 
             yield filtered_batch
 
@@ -181,7 +180,7 @@ def train(cfg: TrainPipelineConfig):
     # optimizer, lr_scheduler = make_optimizer_and_scheduler(cfg, policy)
     # grad_scaler = GradScaler(device.type, enabled=cfg.policy.use_amp)
 
-    # step = 0  # number of policy updates (forward + backward + optim)
+    step = 0  # number of policy updates (forward + backward + optim)
 
     # if cfg.resume:
     #     step, optimizer, lr_scheduler = load_training_state(cfg.checkpoint_path, optimizer, lr_scheduler)
@@ -226,40 +225,44 @@ def train(cfg: TrainPipelineConfig):
         exclude_features += ["observation.force", "observation.force_is_pad"]
     obj_detector = None
     if cfg.use_language_tip:
-        from simplify_work.obj_dection.detector_api import GroundingDINOProcessor
-        obj_detector = GroundingDINOProcessor(
-            text_prompt="The Gripper And The Pyramid-Shaped Sachet",
-            device="cpu",
+        from simplify_work.obj_dection.obj_detector_api import YOLOProcessor
+        obj_detector = YOLOProcessor(
+            device="cuda",
         )
+
 
     # 包装 dataloader
     dataloader = FilteredBatchLoader(raw_dataloader, exclude_features, obj_detector=obj_detector)
     peek_batch = next(iter(dataloader))
-    print("真正训练的时候甬道的feature：", list(peek_batch.keys()))
-    print("任务 task 示例：",peek_batch["task"])
-    raise KeyError("task搞定")
+    print("task示例",peek_batch["task"])
+    # print("真正训练的时候甬道的feature：", list(peek_batch.keys()))
+    raise KeyError("测试task")
+
+
+
 
 
     dl_iter = cycle(dataloader)
 
-    policy.train()
+    # policy.train()
 
-    train_metrics = {
-        "loss": AverageMeter("loss", ":.3f"),
-        "grad_norm": AverageMeter("grdn", ":.3f"),
-        "lr": AverageMeter("lr", ":0.1e"),
-        "update_s": AverageMeter("updt_s", ":.3f"),
-        "dataloading_s": AverageMeter("data_s", ":.3f"),
-    }
+    # train_metrics = {
+    #     "loss": AverageMeter("loss", ":.3f"),
+    #     "grad_norm": AverageMeter("grdn", ":.3f"),
+    #     "lr": AverageMeter("lr", ":0.1e"),
+    #     "update_s": AverageMeter("updt_s", ":.3f"),
+    #     "dataloading_s": AverageMeter("data_s", ":.3f"),
+    # }
 
-    train_tracker = MetricsTracker(
-        cfg.batch_size, dataset.num_frames, dataset.num_episodes, train_metrics, initial_step=step
-    )
+    # train_tracker = MetricsTracker(
+    #     cfg.batch_size, dataset.num_frames, dataset.num_episodes, train_metrics, initial_step=step
+    # )
 
     logging.info("Start offline training on a fixed dataset")
     for _ in range(step, cfg.steps):
         start_time = time.perf_counter()
         batch = next(dl_iter)
+        continue
         train_tracker.dataloading_s = time.perf_counter() - start_time
 
         for key in batch:

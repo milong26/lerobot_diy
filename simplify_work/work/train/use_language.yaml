@@ -1,7 +1,7 @@
 
 dataset:
   repo_id: lerobot/svla_so101_pickplace
-  root: training_dataset/0709data_first50
+  root: training_dataset/0722new/first50
 
 batch_size: 64
 steps: 20000
