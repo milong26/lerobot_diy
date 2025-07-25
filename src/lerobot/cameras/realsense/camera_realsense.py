@@ -467,6 +467,15 @@ class RealSenseCamera(Camera):
                 f"Invalid requested color mode '{color_mode}'. Expected {ColorMode.RGB} or {ColorMode.BGR}."
             )
 
+
+        # 以前的depth
+                # if depth_frame:
+            #         h, w = image.shape
+            # image = cv2.applyColorMap(
+            #         cv2.convertScaleAbs(image, alpha=0.03),
+            #         cv2.COLORMAP_JET
+            #         )
+            # c=3
         if depth_frame:
             h, w = image.shape
             image = cv2.applyColorMap(
