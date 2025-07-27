@@ -160,7 +160,7 @@ def train(cfg: TrainPipelineConfig):
     torch.backends.cuda.matmul.allow_tf32 = True
 
     logging.info("Creating dataset")
-    dataset = make_dataset(cfg)
+    dataset = make_dataset(cfg,use_true_depth=True)
 
     # Create environment used for evaluating checkpoints during training on simulation data.
     # On real-world data, no need to create an environment as evaluations are done outside train.py,
@@ -297,7 +297,8 @@ def train(cfg: TrainPipelineConfig):
 
 
     # 包装 dataloader
-    dataloader = FilteredBatchLoader(raw_dataloader, exclude_features, obj_detector=obj_detector)
+    # dataloader = FilteredBatchLoader(raw_dataloader, exclude_features, obj_detector=obj_detector)
+    dataloader=raw_dataloader
     peek_batch = next(iter(dataloader))
     print("真正训练的时候甬道的feature：", list(peek_batch.keys()))
     

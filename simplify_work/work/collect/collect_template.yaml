@@ -12,14 +12,14 @@ robot:
       use_depth: true
     wrist:
       type: opencv
-      index_or_path: 13
+      index_or_path: 7
       width: 640
       height: 480
       fps: 30
   sensors:
     wrist:
       type: WowForceSensor
-      port: /dev/ttyACM2
+      port: /dev/ttyACM3
       num_mags: 5
   
 
@@ -33,9 +33,11 @@ teleop:
 display_data: false
 
 dataset:
-  repo_id: 0724test/test
-  num_episodes: 1
+  repo_id: 0725fordepth/pickplace
+  num_episodes: 10
   single_task: "pick up the pyramid-shaped sachet and place it into the box."
   episode_time_s: 15
   push_to_hub: false
   reset_time_s: 1
+
+resume: True
