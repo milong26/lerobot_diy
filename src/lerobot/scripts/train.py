@@ -170,33 +170,32 @@ def train(cfg: TrainPipelineConfig):
         logging.info("Creating env")
         eval_env = make_env(cfg.env, n_envs=cfg.eval.batch_size, use_async_envs=cfg.eval.use_async_envs)
 
-    # logging.info("Creating policy")
-    # logging.info("Creating policy")
-    # policy = make_policy(
-    #     cfg=cfg.policy,
-    #     ds_meta=dataset.meta,
-    # )
+    logging.info("Creating policy")
+    policy = make_policy(
+        cfg=cfg.policy,
+        ds_meta=dataset.meta,
+    )
 
-    # logging.info("Creating optimizer and scheduler")
-    # optimizer, lr_scheduler = make_optimizer_and_scheduler(cfg, policy)
-    # grad_scaler = GradScaler(device.type, enabled=cfg.policy.use_amp)
+    logging.info("Creating optimizer and scheduler")
+    optimizer, lr_scheduler = make_optimizer_and_scheduler(cfg, policy)
+    grad_scaler = GradScaler(device.type, enabled=cfg.policy.use_amp)
 
     step = 0  # number of policy updates (forward + backward + optim)
 
-    # if cfg.resume:
-    #     step, optimizer, lr_scheduler = load_training_state(cfg.checkpoint_path, optimizer, lr_scheduler)
+    if cfg.resume:
+        step, optimizer, lr_scheduler = load_training_state(cfg.checkpoint_path, optimizer, lr_scheduler)
 
-    # num_learnable_params = sum(p.numel() for p in policy.parameters() if p.requires_grad)
-    # num_total_params = sum(p.numel() for p in policy.parameters())
+    num_learnable_params = sum(p.numel() for p in policy.parameters() if p.requires_grad)
+    num_total_params = sum(p.numel() for p in policy.parameters())
 
-    # logging.info(colored("Output dir:", "yellow", attrs=["bold"]) + f" {cfg.output_dir}")
-    # if cfg.env is not None:
-    #     logging.info(f"{cfg.env.task=}")
-    # logging.info(f"{cfg.steps=} ({format_big_number(cfg.steps)})")
-    # logging.info(f"{dataset.num_frames=} ({format_big_number(dataset.num_frames)})")
-    # logging.info(f"{dataset.num_episodes=}")
-    # logging.info(f"{num_learnable_params=} ({format_big_number(num_learnable_params)})")
-    # logging.info(f"{num_total_params=} ({format_big_number(num_total_params)})")
+    logging.info(colored("Output dir:", "yellow", attrs=["bold"]) + f" {cfg.output_dir}")
+    if cfg.env is not None:
+        logging.info(f"{cfg.env.task=}")
+    logging.info(f"{cfg.steps=} ({format_big_number(cfg.steps)})")
+    logging.info(f"{dataset.num_frames=} ({format_big_number(dataset.num_frames)})")
+    logging.info(f"{dataset.num_episodes=}")
+    logging.info(f"{num_learnable_params=} ({format_big_number(num_learnable_params)})")
+    logging.info(f"{num_total_params=} ({format_big_number(num_total_params)})")
 
     if hasattr(cfg.policy, "drop_n_last_frames"):
         shuffle = False
@@ -219,18 +218,18 @@ def train(cfg: TrainPipelineConfig):
         drop_last=False,
     )
     #  构造 exclude list
-    # exclude_features = []
-    # if not cfg.use_depth_image:
-    #     exclude_features += ["observation.images.side_depth", "observation.images.side_depth_is_pad"]
-    # if not cfg.use_force:
-    #     exclude_features += ["observation.force", "observation.force_is_pad"]
-    # obj_detector = None
-    # if cfg.use_language_tip:
-    #     from simplify_work.obj_dection.detector_api import GroundingDINOProcessor
-    #     obj_detector = GroundingDINOProcessor(
-    #         text_prompt="The Gripper And The Pyramid-Shaped Sachet",
-    #         device=device.type,
-    #     )
+    exclude_features = []
+    if not cfg.use_depth_image:
+        exclude_features += ["observation.images.side_depth", "observation.images.side_depth_is_pad"]
+    if not cfg.use_force:
+        exclude_features += ["observation.force", "observation.force_is_pad"]
+    obj_detector = None
+    if cfg.use_language_tip:
+        from simplify_work.obj_dection.detector_api import GroundingDINOProcessor
+        obj_detector = GroundingDINOProcessor(
+            text_prompt="The Gripper And The Pyramid-Shaped Sachet",
+            device=device.type,
+        )
 
     """
     保存图片到本地
@@ -300,89 +299,29 @@ def train(cfg: TrainPipelineConfig):
     # 包装 dataloader
     dataloader = FilteredBatchLoader(raw_dataloader, exclude_features, obj_detector=obj_detector)
     peek_batch = next(iter(dataloader))
-    print("task示例",peek_batch["task"])
-    # print("真正训练的时候甬道的feature：", list(peek_batch.keys()))
-    raise KeyError("测试task")
-    print(peek_batch["observation.images.side_depth"].shape)
-    import cv2
-    import numpy as np
-    from PIL import Image
-    r_count=0
-    b_count=0
-    for i in range(64):
-        image_tensor=peek_batch["observation.images.side_depth"][i]
-        image_np = (image_tensor * 255).permute(1, 2, 0).cpu().numpy().astype(np.uint8)
-        rgb_image=image_np
-    #     # rgb_image 是形状为 (H, W, 3)，类型为 uint8，且通道顺序是 RGB
-    #     img = Image.fromarray(rgb_image)  # 自动识别为 RGB 模式
-    #     img.save(f"from_videos/{i}.png")
-    #     print(f"保存成功{i}.png")
-    # depth_encoded_path='frame_000000.png'
+    print("真正训练的时候甬道的feature：", list(peek_batch.keys()))
     
-    # cv2_img = cv2.imread(depth_encoded_path, cv2.IMREAD_UNCHANGED)
-
-    # 通道调换顺序比较
-    # image_np_bgr = image_np[..., ::-1]  # RGB to BGR
-
-    # 直接比较差异
-    # 依次比较每个通道
-    
-
-        r = rgb_image[:, :, 0].astype(np.uint16)
-        g = rgb_image[:, :, 1].astype(np.uint16)
-        b = rgb_image[:, :, 2].astype(np.uint16)
-        print("r=",r[220][230])
-        print("g=",b[220][230])
-    # g_corrected = (g // 8) * 4  # 对低位进行4的倍数截断，抵消抖动
-    # depth_smooth = (r << 8) | g_corrected
-
-    # depth_uint16 =  g.astype(np.uint16)
-    # depth_r_only1 = (rgb_image[:, :, 0].astype(np.uint16)) << 8
-
-
-    # b, g, r = cv2.split(cv2_img)
-    # print(r[220][230])
-    # print(b[220][230])
-    # depth_uint162 = (r << 8) | g.astype(np.uint16)
-    # depth_r_only2 = (cv2_img[:, :, 0].astype(np.uint16)) << 8
-    # import numpy as np
-
-    # # 1. 绝对误差图
-    # diff = np.abs(cv2_img.astype(np.int16) - rgb_image.astype(np.int16))
-    # diff_gray = np.mean(diff, axis=2)  # 转灰度看差异强度
-    # abs_diff = np.abs(depth_uint16.astype(np.int32) - depth_uint162.astype(np.int32))
-    # abs_diffabs_diff_r_only=np.abs(depth_smooth.astype(np.int32) - depth_uint162.astype(np.int32))
-
-    # 2. 打印统计量
-    print("绝对误差统计:")
-    print(f"最大误差: {abs_diff.max()}")
-    print(f"平均误差: {abs_diff.mean():.2f}")
-    print(f"误差为0的像素占比: {(abs_diff == 0).sum() / abs_diff.size:.2%}")
-    print(f"误差大于10的像素占比: {(abs_diff > 10).sum() / abs_diff.size:.2%}")
-    
-    raise KeyError("stop")
 
     dl_iter = cycle(dataloader)
 
-    # policy.train()
+    policy.train()
 
-    # train_metrics = {
-    #     "loss": AverageMeter("loss", ":.3f"),
-    #     "grad_norm": AverageMeter("grdn", ":.3f"),
-    #     "lr": AverageMeter("lr", ":0.1e"),
-    #     "update_s": AverageMeter("updt_s", ":.3f"),
-    #     "dataloading_s": AverageMeter("data_s", ":.3f"),
-    # }
+    train_metrics = {
+        "loss": AverageMeter("loss", ":.3f"),
+        "grad_norm": AverageMeter("grdn", ":.3f"),
+        "lr": AverageMeter("lr", ":0.1e"),
+        "update_s": AverageMeter("updt_s", ":.3f"),
+        "dataloading_s": AverageMeter("data_s", ":.3f"),
+    }
 
-    # train_tracker = MetricsTracker(
-    #     cfg.batch_size, dataset.num_frames, dataset.num_episodes, train_metrics, initial_step=step
-    # )
+    train_tracker = MetricsTracker(
+        cfg.batch_size, dataset.num_frames, dataset.num_episodes, train_metrics, initial_step=step
+    )
 
     logging.info("Start offline training on a fixed dataset")
     for _ in range(step, cfg.steps):
         start_time = time.perf_counter()
         batch = next(dl_iter)
-        continue
         train_tracker.dataloading_s = time.perf_counter() - start_time
 
         for key in batch:
