@@ -341,6 +341,8 @@ class LeRobotDataset(torch.utils.data.Dataset):
         download_videos: bool = True,
         video_backend: str | None = None,
         batch_encoding_size: int = 1,
+        # 为了控制是否使用真~深度图片而不是采用有损失的视频
+        use_true_depth: bool= False
     ):
         """
         2 modes are available for instantiating this class, depending on 2 different use cases:
@@ -457,6 +459,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         self.delta_indices = None
         self.batch_encoding_size = batch_encoding_size
         self.episodes_since_last_encoding = 0
+        self.use_true_depth=use_true_depth
 
         # Unused attributes
         self.image_writer = None
@@ -680,8 +683,44 @@ class LeRobotDataset(torch.utils.data.Dataset):
             for key, q_idx in query_indices.items()
             if key not in self.meta.video_keys
         }
+    
+    # 从images文件夹里读取
+    def read_image_frames_from_disk(
+        self,
+        cam_key: str,
+        ep_idx: int,
+        query_indices
+    ) -> torch.Tensor:
+        """
+        Reads frames from images/{cam_key}/episode_{ep_idx} that match query_timestamps.
+        Assumes one image per timestamp in order, named frame_000000.png, etc.
 
-    def _query_videos(self, query_timestamps: dict[str, list[float]], ep_idx: int) -> dict[str, torch.Tensor]:
+        Returns:
+            torch.Tensor: Tensor of shape [N, 3, H, W], float32, in [0,1]
+        """
+        import torchvision.transforms.functional as TF
+
+        # 1. Image directory
+        images_dir = self.root / "images" / cam_key / f"episode_{ep_idx:06d}"
+        if not images_dir.exists():
+            raise FileNotFoundError(f"Image directory does not exist: {images_dir}")
+
+        # 2. Get episode timestamps from self.episode_data_index
+
+        # 5. Load corresponding image files
+        frames = []
+        for i in query_indices:
+            fname = images_dir / f"frame_{i:06d}.png"
+            if not fname.exists():
+                raise FileNotFoundError(f"Expected frame not found: {fname}")
+            img = PIL.Image.open(fname).convert("RGB")
+            frames.append(TF.to_tensor(img))  # float32, [0, 1], shape [3, H, W]
+
+        return torch.stack(frames)  # [N, 3, H, W]
+
+
+
+    def _query_videos(self, query_timestamps: dict[str, list[float]], ep_idx: int,query_indices) -> dict[str, torch.Tensor]:
         """Note: When using data workers (e.g. DataLoader with num_workers>0), do not call this function
         in the main process (e.g. by using a second Dataloader with num_workers=0). It will result in a
         Segmentation Fault. This probably happens because a memory reference to the video loader is created in
@@ -689,6 +728,13 @@ class LeRobotDataset(torch.utils.data.Dataset):
         """
         item = {}
         for vid_key, query_ts in query_timestamps.items():
+            # 当use_true_depth且vid_key此时含有depth的时候,传入图片index,也就是query_indices
+            if self.use_true_depth and "depth" in vid_key:
+                frames = self.read_image_frames_from_disk(
+                    vid_key,
+                    ep_idx, 
+                    query_indices)
+                
             video_path = self.root / self.meta.get_video_file_path(ep_idx, vid_key)
             frames = decode_video_frames(video_path, query_ts, self.tolerance_s, self.video_backend)
             item[vid_key] = frames.squeeze(0)
@@ -704,6 +750,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         return self.num_frames
 
     def __getitem__(self, idx) -> dict:
+        print("调用一次getitem")
         item = self.hf_dataset[idx]
         ep_idx = item["episode_index"].item()
 
@@ -718,7 +765,9 @@ class LeRobotDataset(torch.utils.data.Dataset):
         if len(self.meta.video_keys) > 0:
             current_ts = item["timestamp"].item()
             query_timestamps = self._get_query_timestamps(current_ts, query_indices)
-            video_frames = self._query_videos(query_timestamps, ep_idx)
+            # 本来只传入timestamp是针对视频
+            # 为了读图片传入query_indices
+            video_frames = self._query_videos(query_timestamps, ep_idx,query_indices=query_indices)
             item = {**video_frames, **item}
 
         if self.image_transforms is not None:
@@ -974,7 +1023,8 @@ class LeRobotDataset(torch.utils.data.Dataset):
                 episode_index=episode_index, image_key=key, frame_index=0
             ).parent
             encode_video_frames(img_dir, video_path, self.fps, overwrite=True)
-            shutil.rmtree(img_dir)
+            # 为了使用深度图,不删除
+            # shutil.rmtree(img_dir)
 
         # Update video info (only needed when first episode is encoded since it reads from episode 0)
         if len(self.meta.video_keys) > 0 and episode_index == 0:

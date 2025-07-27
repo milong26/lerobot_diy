@@ -6,7 +6,7 @@
 
 dataset:
   repo_id: lerobot/svla_so101_pickplace
-  root: /home/qwe/.cache/huggingface/lerobot/0722work/pickplace_50/
+  root: /home/qwe/.cache/huggingface/lerobot/0725test/test/
 
 batch_size: 64
 steps: 20000
