@@ -26,6 +26,8 @@ sevenpoints = [
     (594, 212), (614, 326), (576, 340), (538, 350)
 ]
 
+
+
 # 半径为2的区域采样
 def get_local_depth_mean(depth_map, x, y, r=2):
     h, w = depth_map.shape
