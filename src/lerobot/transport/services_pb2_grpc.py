@@ -5,7 +5,7 @@ import warnings
 
 from lerobot.transport import services_pb2 as lerobot_dot_transport_dot_services__pb2
 
-GRPC_GENERATED_VERSION = '1.73.1'
+GRPC_GENERATED_VERSION = '1.74.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -25,7 +25,7 @@ if _version_not_supported:
     )
 
 
-class LearnerServiceStub:
+class LearnerServiceStub(object):
     """LearnerService: the Actor calls this to push transitions.
     The Learner implements this service.
     """
@@ -58,7 +58,7 @@ class LearnerServiceStub:
                 _registered_method=True)
 
 
-class LearnerServiceServicer:
+class LearnerServiceServicer(object):
     """LearnerService: the Actor calls this to push transitions.
     The Learner implements this service.
     """
@@ -119,7 +119,7 @@ def add_LearnerServiceServicer_to_server(servicer, server):
 
 
  # This class is part of an EXPERIMENTAL API.
-class LearnerService:
+class LearnerService(object):
     """LearnerService: the Actor calls this to push transitions.
     The Learner implements this service.
     """
@@ -233,7 +233,7 @@ class LearnerService:
             _registered_method=True)
 
 
-class AsyncInferenceStub:
+class AsyncInferenceStub(object):
     """AsyncInference: from Robot perspective
     Robot send observations to & executes action received from a remote Policy server
     """
@@ -266,7 +266,7 @@ class AsyncInferenceStub:
                 _registered_method=True)
 
 
-class AsyncInferenceServicer:
+class AsyncInferenceServicer(object):
     """AsyncInference: from Robot perspective
     Robot send observations to & executes action received from a remote Policy server
     """
@@ -328,7 +328,7 @@ def add_AsyncInferenceServicer_to_server(servicer, server):
 
 
  # This class is part of an EXPERIMENTAL API.
-class AsyncInference:
+class AsyncInference(object):
     """AsyncInference: from Robot perspective
     Robot send observations to & executes action received from a remote Policy server
     """
