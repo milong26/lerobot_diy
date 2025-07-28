@@ -326,6 +326,19 @@ class LeRobotDatasetMetadata:
         obj.revision = None
         return obj
 
+def load_modified_tasks(path):
+    """从 JSONL 文件中加载修改后的任务，返回 nested dict[ep_idx][frame_idx] = task"""
+    from collections import defaultdict
+    import json
+
+    result = defaultdict(dict)
+    with open(path, "r") as f:
+        for line in f:
+            item = json.loads(line)
+            ep = item["episode_index"]
+            frame = item["frame_index"]
+            result[ep][frame] = item["task"]
+    return result
 
 class LeRobotDataset(torch.utils.data.Dataset):
     def __init__(
@@ -499,6 +512,20 @@ class LeRobotDataset(torch.utils.data.Dataset):
         if self.delta_timestamps is not None:
             check_delta_timestamps(self.delta_timestamps, self.fps, self.tolerance_s)
             self.delta_indices = get_delta_indices(self.delta_timestamps, self.fps)
+
+        # 为了深度,获得episode_index对应的frame index
+        self.episode_start_indices = {}
+        for idx in range(len(self.hf_dataset)):
+            item = self.hf_dataset[idx]
+            ep_idx = item["episode_index"].item()
+            if ep_idx not in self.episode_start_indices:
+                self.episode_start_indices[ep_idx] = idx
+
+
+
+        self.modified_tasks = load_modified_tasks("training_dataset/0727pickplace/first100/meta/modified_tasks_filled.jsonl")
+
+
 
     def push_to_hub(
         self,
@@ -710,10 +737,12 @@ class LeRobotDataset(torch.utils.data.Dataset):
         # 5. Load corresponding image files
         frames = []
         for i in query_indices:
+            i = int(i)
             fname = images_dir / f"frame_{i:06d}.png"
             if not fname.exists():
                 raise FileNotFoundError(f"Expected frame not found: {fname}")
             img = PIL.Image.open(fname).convert("RGB")
+            img_np = np.array(img)                  # 转成 NumPy 数组，形状为 (H, W, 3)
             frames.append(TF.to_tensor(img))  # float32, [0, 1], shape [3, H, W]
 
         return torch.stack(frames)  # [N, 3, H, W]
@@ -727,6 +756,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         the main process and a subprocess fails to access it.
         """
         item = {}
+        
         for vid_key, query_ts in query_timestamps.items():
             # 当use_true_depth且vid_key此时含有depth的时候,传入图片index,也就是query_indices
             if self.use_true_depth and "depth" in vid_key:
@@ -734,9 +764,9 @@ class LeRobotDataset(torch.utils.data.Dataset):
                     vid_key,
                     ep_idx, 
                     query_indices)
-                
-            video_path = self.root / self.meta.get_video_file_path(ep_idx, vid_key)
-            frames = decode_video_frames(video_path, query_ts, self.tolerance_s, self.video_backend)
+            else:
+                video_path = self.root / self.meta.get_video_file_path(ep_idx, vid_key)
+                frames = decode_video_frames(video_path, query_ts, self.tolerance_s, self.video_backend)
             item[vid_key] = frames.squeeze(0)
 
         return item
@@ -750,10 +780,10 @@ class LeRobotDataset(torch.utils.data.Dataset):
         return self.num_frames
 
     def __getitem__(self, idx) -> dict:
-        print("调用一次getitem")
         item = self.hf_dataset[idx]
         ep_idx = item["episode_index"].item()
-
+        
+        # query_indices是
         query_indices = None
         if self.delta_indices is not None:
             query_indices, padding = self._get_query_indices(idx, ep_idx)
@@ -761,13 +791,20 @@ class LeRobotDataset(torch.utils.data.Dataset):
             item = {**item, **padding}
             for key, val in query_result.items():
                 item[key] = val
-
+        episode_start_idx = self.episode_start_indices[ep_idx]
+        frame_idx = [
+            i - episode_start_idx for i in query_indices['observation.images.side_depth']
+        ]
+        if not len(frame_idx) == 1:
+            raise KeyError("说好只读一个呢")
+        # frame_idx=frame_idx[0]
         if len(self.meta.video_keys) > 0:
             current_ts = item["timestamp"].item()
             query_timestamps = self._get_query_timestamps(current_ts, query_indices)
             # 本来只传入timestamp是针对视频
             # 为了读图片传入query_indices
-            video_frames = self._query_videos(query_timestamps, ep_idx,query_indices=query_indices)
+            
+            video_frames = self._query_videos(query_timestamps, ep_idx,frame_idx)
             item = {**video_frames, **item}
 
         if self.image_transforms is not None:
@@ -776,8 +813,24 @@ class LeRobotDataset(torch.utils.data.Dataset):
                 item[cam] = self.image_transforms(item[cam])
 
         # Add task as a string
-        task_idx = item["task_index"].item()
-        item["task"] = self.meta.tasks[task_idx]
+
+        if self.use_true_depth:
+            # 从本地读取
+            if not len(frame_idx) == 1:
+                raise KeyError("说好只读一个呢")
+            frame_idx=frame_idx[0]
+            if hasattr(self, "modified_tasks") and ep_idx in self.modified_tasks and frame_idx in self.modified_tasks[ep_idx]:
+                item["task"] = self.modified_tasks[ep_idx][frame_idx]
+            else:
+                task_idx = item["task_index"].item()
+                item["task"] = self.meta.tasks[task_idx]
+        else:
+            # 平常的task
+            task_idx = item["task_index"].item()
+            item["task"] = self.meta.tasks[task_idx]
+
+
+
 
         return item
 

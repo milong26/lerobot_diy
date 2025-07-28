@@ -80,6 +80,7 @@ class SmolVLMWithExpertModel(nn.Module):
                 device_map="auto",
                 torch_dtype="bfloat16",
                 low_cpu_mem_usage=True,
+                # max_memory={0: "10GiB"}
             )
             config = self.vlm.config
         else:
