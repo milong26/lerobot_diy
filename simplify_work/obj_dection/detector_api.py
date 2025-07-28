@@ -48,6 +48,16 @@ class YOLOProcessor:
         return image_np
 
 
+    def _get_bbox_center(self, bbox):
+        """
+        给定bbox = [x1, y1, x2, y2]，返回中心点 (cx, cy)
+        """
+        x1, y1, x2, y2 = bbox
+        cx = int((x1 + x2) / 2)
+        cy = int((y1 + y2) / 2)
+        return (cx, cy)
+
+
     def opencv_detect_yellow_object(self, color_image):
         """使用OpenCV检测淡黄色物体"""
         # 转换为HSV颜色空间
@@ -88,6 +98,8 @@ class YOLOProcessor:
         # 1. 图像预处理
         image_tensor = self._transform_image(side_img)
         depth_tensor=self._transform_image(side_depth)
+
+
         
         # # 2. YOLO推理 - 只检测夹子
         gripper_center = None
@@ -95,6 +107,7 @@ class YOLOProcessor:
         threed_pos = [None, None]
         
         # 检测夹子
+        # torch.cuda.set_device(self.device)
         results = self.model.predict(
             image_tensor, 
             imgsz=640,
@@ -102,7 +115,7 @@ class YOLOProcessor:
             device=self.device,
             verbose=False
         )
-        
+        # torch.cuda.set_device(self.device)
         # 3. 解析YOLO结果 - 只取夹子
         for result in results:
             if result.boxes is not None:
@@ -125,17 +138,17 @@ class YOLOProcessor:
         if object_center is not None:
             centers.append(object_center)
         
-        #         # 统计逻辑
-        # self.total_images += 1
-        # if gripper_center is not None:
-        #     self.gripper_detected += 1
-        # if object_center is not None:
-        #     self.object_detected += 1
+                # 统计逻辑
+        self.total_images += 1
+        if gripper_center is not None:
+            self.gripper_detected += 1
+        if object_center is not None:
+            self.object_detected += 1
 
         
         # # 6. 转换为3D坐标
         if centers:
-            threed_pos = self.pixel_to_3d(side_depth, centers)
+            threed_pos = self.pixel_to_3d(depth_tensor, centers)
 
         """
         测试center是否正确
@@ -155,7 +168,7 @@ class YOLOProcessor:
 
 
 
-    def transform_camera_to_custom_coordsystem(points_3d):
+    def transform_camera_to_custom_coordsystem(self,points_3d):
         """
         将一组相机坐标转换为自定义坐标系（以机械臂底座为原点，布面为XY平面）
         Args:
@@ -166,11 +179,10 @@ class YOLOProcessor:
 
         # 已知平均局部坐标系（三个单位向量 + 原点）
         # 这个坐标系要重新修改
-        origin = np.array([0.03217833, -0.01095684, 0.07867188])
-
-        x_axis = np.array([-0.24203161,  0.33476907, -0.91068676])
-        y_axis = np.array([ 0.40107384,  0.27464791,  0.87390406])
-        z_axis = np.array([ 0.90643808, -0.25679492, -0.33530044])
+        origin = np.array([ 0.24163092, -0.08227619,  0.60075652])
+        x_axis = np.array([-0.36651895, -0.77909696,  0.50859786])
+        y_axis = np.array([-0.92731940,  0.26136948, -0.26788937])
+        z_axis = np.array([ 0.07577983, -0.56981920, -0.81826860])
 
         # 构建旋转矩阵（列向量为各轴）
         R = np.stack([x_axis, y_axis, z_axis], axis=1)  # shape (3,3)
@@ -187,12 +199,61 @@ class YOLOProcessor:
 
         return converted
 
-    
+    def get_average_sevenpoints_3d_coords(self, depth_batch):
+        """
+        给定一组彩色深度图，计算指定7个像素点在所有图像中的3D坐标均值。
+        
+        Args:
+            depth_batch (List[np.ndarray]): 每张图是彩色编码深度图（H x W x 3）
+        Returns:
+            List[Tuple[float, float, float] or None]: 每个点的平均3D坐标
+        """
+
+        sevenpoints = [
+            (557, 149), (633, 261), (612, 236),
+            (594, 212), (614, 326), (576, 340), (538, 350)
+        ]
+        
+        # 每个点的位置分别记录有效的3D坐标值
+        collected_points = [[] for _ in range(len(sevenpoints))]
+
+        for depth_img in depth_batch:
+            # 对当前图像计算7个点的3D坐标
+            depth_tensor=self._transform_image(depth_img)
+            points_3d = self.pixel_to_3d(depth_tensor, sevenpoints)
+            
+            for i, p in enumerate(points_3d):
+                if p is not None:
+                    collected_points[i].append(np.array(p))
+
+        # 对每个点求平均值
+        avg_points = []
+        for pts in collected_points:
+            if len(pts) == 0:
+                avg_points.append(None)
+            else:
+                mean = np.mean(pts, axis=0)
+                avg_points.append(tuple(float(v) for v in mean))
+
+        return avg_points
+
+        
     def add_depth_info_to_task(self, rgb_batch, depth_batch, task_batch):
+
+
+        rgb_batch = rgb_batch.to(self.device)
+        depth_batch = depth_batch.to(self.device)
         """添加深度信息到任务描述"""
         updated_tasks = []
         
         for rgb, depth, task in zip(rgb_batch, depth_batch, task_batch):
+
+            # 如果已经加了就跳过
+            if "|" in task or "gripper at" in task or "Pyramid-Shaped Sachet at" in task:
+                print("处理过了,pass")
+                updated_tasks.append(task_str)
+                continue
+
             # 获取两个目标的3D坐标(相机坐标系)
             points_3d = self.process_sample(rgb, depth)
 
@@ -207,9 +268,9 @@ class YOLOProcessor:
                 a_str = f"({a[0]:.3f}, {a[1]:.3f}, {a[2]:.3f})" if a is not None else "(N/A, N/A, N/A)"
                 b_str = f"({b[0]:.3f}, {b[1]:.3f}, {b[2]:.3f})" if b is not None else "(N/A, N/A, N/A)"
                 
-                task_str = f"{task} | gripper at {a_str}, the Pyramid-Shaped Sachet at {b_str}"
+                task_str = f"{task} | gripper at {a_str}m, the Pyramid-Shaped Sachet at {b_str}m"
             else:
-                task_str = f"{task} | insufficient valid 3D points"
+                task_str = f"{task} |"
             
             updated_tasks.append(task_str)
         
@@ -253,12 +314,11 @@ class YOLOProcessor:
     # 无损返回深度值 根本不可能实现
     def decode_depth_from_rgb(self,rgb_image: np.ndarray) -> np.ndarray:
         # 此时的rgb_image是彩色深度图.用rg复原depth_uint16
-        r = rgb_image[:, :, 0].astype(np.uint16)
-        g = rgb_image[:, :, 1].astype(np.uint16)
-        b = rgb_image[:, :, 2].astype(np.uint16)
+        r = rgb_image[:, :, 0].astype(np.uint8)
+        g = rgb_image[:, :, 1].astype(np.uint8)
+        b = rgb_image[:, :, 2].astype(np.uint8)
         # 先给图片去边缘(大概把)
-        b_final = self.remove_edge_of_r_cahnnel(r)
-        depth_uint16 = ((b_final.astype(np.uint16) << 8) | g.astype(np.uint16))
+        depth_uint16 = ((r.astype(np.uint16) << 8) | g.astype(np.uint16))
         return depth_uint16
 
     def pixel_to_3d(self, depth_image, pixels, radius=5):

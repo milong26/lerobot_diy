@@ -57,34 +57,60 @@ import os
 # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
+
+# # train.py 开头
+# import os
+
+# import torch.multiprocessing as mp
+# mp.set_start_method("spawn", force=True)
+
+
 # 为了filter raw dataset
+import json
+from pathlib import Path
+
 class FilteredBatchLoader:
-    def __init__(self, dataloader, exclude_keys: list, obj_detector=None):
+    def __init__(self, dataloader, exclude_keys: list, obj_detector=None, save_task_path='training_dataset/0727pickplace/first100/meta/modified_tasks.jsonl'):
         self.dataloader = dataloader
         self.exclude_keys = set(exclude_keys)
-        self.obj_detector = obj_detector  # 新增
+        self.obj_detector = obj_detector
+        self.save_task_path = Path(save_task_path) if save_task_path else None
+        if self.save_task_path:
+            self.save_task_path.parent.mkdir(parents=True, exist_ok=True)
+            self.task_f = open(self.save_task_path, "a")  # 以 append 模式写入
+    
+    def __del__(self):
+        if hasattr(self, "task_f") and not self.task_f.closed:
+            self.task_f.close()
 
     def __iter__(self):
         for batch in self.dataloader:
-            # print("第几个batch")
-            # 先过滤掉无用字段
             filtered_batch = {k: v for k, v in batch.items() if k not in self.exclude_keys}
 
-            # 如果有 obj_detector，就处理每张图
             if self.obj_detector is not None:
-                # images都是tensor格式的
-                images = filtered_batch["observation.images.side"]            # [B, C, H, W]
-                depths = filtered_batch["observation.images.side_depth"]      # [B, 1, H, W]
-                tasks = filtered_batch["task"]                                 # list[str] or tensor of strings
-                # new_tasks: list[str]，和原始 tasks 长度一致
+                images = filtered_batch["observation.images.side"]
+                depths = filtered_batch["observation.images.side_depth"]
+                tasks = filtered_batch["task"]
+
                 new_tasks = self.obj_detector.add_depth_info_to_task(images, depths, tasks)
-                filtered_batch["task"] = new_tasks  # 覆盖原 task
+                filtered_batch["task"] = new_tasks
+
+                # ✅ 保存每帧的修改后task
+                if self.save_task_path:
+                    ep_indices = filtered_batch["episode_index"]
+                    frame_indices = filtered_batch["frame_index"]
+                    for ep, frame, task in zip(ep_indices, frame_indices, new_tasks):
+                        record = {
+                            "episode_index": int(ep.item()),
+                            "frame_index": int(frame.item()),
+                            "task": task,
+                        }
+                        self.task_f.write(json.dumps(record) + "\n")
+
                 self.obj_detector.print_statistics()
 
             yield filtered_batch
 
-    def __len__(self):
-        return len(self.dataloader)
 
 
 
@@ -160,7 +186,10 @@ def train(cfg: TrainPipelineConfig):
     torch.backends.cuda.matmul.allow_tf32 = True
 
     logging.info("Creating dataset")
-    dataset = make_dataset(cfg,use_true_depth=True)
+    use_true_depth=False
+    if cfg.use_language_tip:
+        use_true_depth=True
+    dataset = make_dataset(cfg,use_true_depth=use_true_depth)
 
     # Create environment used for evaluating checkpoints during training on simulation data.
     # On real-world data, no need to create an environment as evaluations are done outside train.py,
@@ -224,12 +253,10 @@ def train(cfg: TrainPipelineConfig):
     if not cfg.use_force:
         exclude_features += ["observation.force", "observation.force_is_pad"]
     obj_detector = None
-    if cfg.use_language_tip:
-        from simplify_work.obj_dection.detector_api import GroundingDINOProcessor
-        obj_detector = GroundingDINOProcessor(
-            text_prompt="The Gripper And The Pyramid-Shaped Sachet",
-            device=device.type,
-        )
+    # 显存足够的情况下可以这么搞(虽然有一点误差),现在改成本地文件了
+    # if cfg.use_language_tip:
+    #     from simplify_work.obj_dection.detector_api import YOLOProcessor
+    #     obj_detector = YOLOProcessor()
 
     """
     保存图片到本地
@@ -297,12 +324,16 @@ def train(cfg: TrainPipelineConfig):
 
 
     # 包装 dataloader
-    # dataloader = FilteredBatchLoader(raw_dataloader, exclude_features, obj_detector=obj_detector)
-    dataloader=raw_dataloader
-    peek_batch = next(iter(dataloader))
-    print("真正训练的时候甬道的feature：", list(peek_batch.keys()))
-    
+    dataloader = FilteredBatchLoader(raw_dataloader, exclude_features, obj_detector=obj_detector)
 
+    # 测试
+    # peek_batch = next(iter(dataloader))
+    # print("真正训练的时候甬道的feature：", list(peek_batch.keys()))
+    # # 检测能否得到正确的depth
+    # print("task示例",peek_batch["task"][0])
+
+
+    # start train
     dl_iter = cycle(dataloader)
 
     policy.train()
@@ -328,6 +359,7 @@ def train(cfg: TrainPipelineConfig):
         for key in batch:
             if isinstance(batch[key], torch.Tensor):
                 batch[key] = batch[key].to(device, non_blocking=device.type == "cuda")
+        # print("task示例",batch["task"])
 
         train_tracker, output_dict = update_policy(
             train_tracker,
