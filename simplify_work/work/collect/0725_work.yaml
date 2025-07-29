@@ -39,5 +39,6 @@ dataset:
   episode_time_s: 15
   push_to_hub: false
   reset_time_s: 1
+  save_image_folder: true
 
 resume: True

@@ -362,7 +362,17 @@ class YOLOProcessor:
         return points_3d
 
     def count_distance(self, rgb_batch, depth_batch):
-        """计算两个目标之间的距离"""
+        """计算两个目标之间的距离。支持单张图像或batch输入"""
+        
+        # 判断是否是单张图片（Tensor）
+        # TODO:不确定是tensor还是numpy
+        is_single = isinstance(rgb_batch, torch.Tensor) and rgb_batch.dim() == 3
+
+        # 如果是单张图片，包装成列表
+        if is_single:
+            rgb_batch = [rgb_batch]
+            depth_batch = [depth_batch]
+
         distances = []
         for rgb, depth in zip(rgb_batch, depth_batch):
             points_3d = self.process_sample(rgb, depth)
@@ -371,12 +381,16 @@ class YOLOProcessor:
                 a = points_3d[0]
                 b = points_3d[1]
                 distance = math.sqrt((a[0] - b[0])**2 + 
-                                     (a[1] - b[1])**2 + 
-                                     (a[2] - b[2])**2)
+                                    (a[1] - b[1])**2 + 
+                                    (a[2] - b[2])**2)
                 distances.append(distance)
             else:
                 distances.append(None)
-        return distances
+
+        # 返回单个值还是列表
+        # 如果是单个，返回一个，else返回一个list
+        return distances[0] if is_single else distances
+
 
     def print_statistics(self):
         """打印识别成功率统计"""
