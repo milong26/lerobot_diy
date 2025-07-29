@@ -146,6 +146,13 @@ class RobotClientConfig:
         default=True, metadata={"help": "Verify that the robot cameras match the policy cameras"}
     )
 
+    # 默认的动作参数
+    high_distance_threshold: float = 1.0
+    low_distance_threshold: float = 0.5
+    high_distance_action_aggregate: int = 5
+    low_distance_action_aggregate: int = 3
+
+
     @property
     def environment_dt(self) -> float:
         """Environment time step, in seconds"""
