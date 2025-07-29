@@ -49,6 +49,7 @@ from lerobot.scripts.server.helpers import (
     get_logger,
     observations_similar,
     raw_observation_to_observation,
+    compute_distance_from_depth
 )
 from lerobot.transport import (
     services_pb2,  # type: ignore
@@ -151,6 +152,8 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
         return services_pb2.Empty()
 
+
+    # 服务器接收并反序列化observation
     def SendObservations(self, request_iterator, context):  # noqa: N802
         """Receive observations from the robot client"""
         client_id = context.peer()
@@ -209,12 +212,27 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             with self._predicted_timesteps_lock:
                 self._predicted_timesteps.add(obs.get_timestep())
 
+
+            # 计算distance
+            try:
+                print("obs.get_observation的内容",obs.get_observation())
+                depth_tensor = obs.get_observation()["observation.images.side_depth"]
+                print("depth_tensor实际的树脂",depth_tensor)
+                raise KeyError("确认depth_tensor的内容")
+                depth_np = depth_tensor.cpu().numpy()
+                distance = compute_distance_from_depth(depth_np)
+            except Exception as e:
+                self.logger.warning(f"Failed to compute distance: {e}")
+                distance = -1.0  # fallback 值
+
             start_time = time.perf_counter()
             action_chunk = self._predict_action_chunk(obs)
             inference_time = time.perf_counter() - start_time
 
             start_time = time.perf_counter()
-            actions_bytes = pickle.dumps(action_chunk)  # nosec
+            # actions_bytes = pickle.dumps(action_chunk)  # nosec
+            # 打包actionchunk+distance
+            actions_bytes = pickle.dumps((action_chunk, distance))  # nosec
             serialize_time = time.perf_counter() - start_time
 
             # Create and return the action chunk
@@ -251,10 +269,12 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         with self._predicted_timesteps_lock:
             predicted_timesteps = self._predicted_timesteps
 
+        # 当前timestamp已经预测过
         if obs.get_timestep() in predicted_timesteps:
             self.logger.debug(f"Skipping observation #{obs.get_timestep()} - Timestep predicted already!")
             return False
-
+        
+        # observation和上一个近似。
         elif observations_similar(obs, previous_obs, lerobot_features=self.lerobot_features):
             self.logger.debug(
                 f"Skipping observation #{obs.get_timestep()} - Observation too similar to last obs predicted!"
