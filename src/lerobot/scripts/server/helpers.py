@@ -300,11 +300,3 @@ def observations_similar(
     return _compare_observation_states(obs1_state, obs2_state, atol=atol)
 
 
-
-def compute_distance_from_depth(depth_image):
-
-
-
-
-    distance=0
-    return distance

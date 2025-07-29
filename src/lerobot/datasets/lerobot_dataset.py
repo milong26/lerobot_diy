@@ -356,6 +356,8 @@ class LeRobotDataset(torch.utils.data.Dataset):
         batch_encoding_size: int = 1,
         # 为了控制是否使用真~深度图片而不是采用有损失的视频
         use_true_depth: bool= False
+        # 控制录制的时候是否保存images文件夹
+        save_image_folder=False
     ):
         """
         2 modes are available for instantiating this class, depending on 2 different use cases:

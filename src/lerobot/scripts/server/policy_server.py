@@ -49,7 +49,6 @@ from lerobot.scripts.server.helpers import (
     get_logger,
     observations_similar,
     raw_observation_to_observation,
-    compute_distance_from_depth
 )
 from lerobot.transport import (
     services_pb2,  # type: ignore
@@ -82,6 +81,16 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         self.lerobot_features = None
         self.actions_per_chunk = None
         self.policy = None
+        
+        # 如果推理的时候需要用distance
+        # TODO 后面要测试language的话也要加载，暂时没想好api怎么写
+        self.count_distance = False
+        if self.count_distance:
+            from simplify_work.obj_dection.detector_api import YOLOProcessor
+            self.obj_detector = YOLOProcessor()
+        else:
+            self.obj_detector = None
+
 
     @property
     def running(self):
@@ -217,7 +226,17 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             try:
                 print("obs.get_observation的内容",obs.get_observation())
                 depth_tensor = obs.get_observation()["observation.images.side_depth"]
+                rgb_tensor=obs.get_observation()["observation.images.side"]
                 print("depth_tensor实际的树脂",depth_tensor)
+                if self.use_distance and self.obj_detector is not None:
+                    distances = self.obj_detector.count_distance(depth_tensor, depth_tensor)
+                else:
+                    distances= None
+                # distance=None:
+                if distance is None:
+                    # 按照距离最近改成0
+                    distance=0
+
                 raise KeyError("确认depth_tensor的内容")
                 depth_np = depth_tensor.cpu().numpy()
                 distance = compute_distance_from_depth(depth_np)
