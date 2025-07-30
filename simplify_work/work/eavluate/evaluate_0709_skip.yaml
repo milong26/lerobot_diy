@@ -18,7 +18,7 @@ robot:
       width: 640
       height: 480
       fps: 30
-      use_depth: false
+      use_depth: true
     wrist:
       type: opencv
       index_or_path: 6
@@ -32,17 +32,12 @@ robot:
   #     num_mags: 5
   
 
-teleop:
-  type: so100_leader
-  port: /dev/ttyACM1
-  id: zhubi
-
 
 # 个性化
 display_data: false
 
 dataset:
-  repo_id: 0709eval/eval_firts50_can_skip
+  repo_id: 0729eval/eval_firts50_can_skip
   num_episodes: 1
   single_task: "pick up the pyramid-shaped sachet and place it into the box."
   episode_time_s: 60

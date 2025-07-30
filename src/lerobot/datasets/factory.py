@@ -66,7 +66,7 @@ def resolve_delta_timestamps(
     return delta_timestamps
 
 
-def make_dataset(cfg: TrainPipelineConfig,use_true_depth) -> LeRobotDataset | MultiLeRobotDataset:
+def make_dataset(cfg: TrainPipelineConfig) -> LeRobotDataset | MultiLeRobotDataset:
     """Handles the logic of setting up delta timestamps and image transforms before creating a dataset.
 
     Args:
@@ -95,7 +95,9 @@ def make_dataset(cfg: TrainPipelineConfig,use_true_depth) -> LeRobotDataset | Mu
             image_transforms=image_transforms,
             revision=cfg.dataset.revision,
             video_backend=cfg.dataset.video_backend,
-            use_true_depth=use_true_depth
+            # 新增
+            use_true_depth=cfg.use_true_depth,
+            use_language_tip=cfg.use_language_tip
         )
     else:
         raise NotImplementedError("The MultiLeRobotDataset isn't supported for now.")

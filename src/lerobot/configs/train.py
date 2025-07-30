@@ -69,6 +69,7 @@ class TrainPipelineConfig(HubMixin):
     use_depth_image: bool=False
     use_force: bool=False
     use_language_tip: bool=False
+    use_true_depth: bool=False
 
     def __post_init__(self):
         self.checkpoint_path = None
