@@ -149,6 +149,7 @@ class RobotClient:
     def running(self):
         return not self.shutdown_event.is_set()
 
+    # 连接到服务器，并发送policy设置，
     def start(self):
         """Start the robot client and connect to the policy server"""
         try:
@@ -230,7 +231,9 @@ class RobotClient:
             timestamps = sorted([action.get_timestep() for action in self.action_queue.queue])
         self.logger.debug(f"Queue size: {queue_size}, Queue contents: {timestamps}")
         return queue_size, timestamps
+    
 
+    # 服务器传来的action要不要放到action_queue里面
     def _aggregate_action_queues(
         self,
         incoming_actions: list[TimedAction],

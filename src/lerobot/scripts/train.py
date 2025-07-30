@@ -95,7 +95,7 @@ class FilteredBatchLoader:
                 new_tasks = self.obj_detector.add_depth_info_to_task(images, depths, tasks)
                 filtered_batch["task"] = new_tasks
 
-                # ✅ 保存每帧的修改后task
+                #  保存每帧的修改后task
                 if self.save_task_path:
                     ep_indices = filtered_batch["episode_index"]
                     frame_indices = filtered_batch["frame_index"]
@@ -186,10 +186,8 @@ def train(cfg: TrainPipelineConfig):
     torch.backends.cuda.matmul.allow_tf32 = True
 
     logging.info("Creating dataset")
-    use_true_depth=False
-    if cfg.use_language_tip:
-        use_true_depth=True
-    dataset = make_dataset(cfg,use_true_depth=use_true_depth)
+    # make_dataset接收的就是cfg
+    dataset = make_dataset(cfg)
 
     # Create environment used for evaluating checkpoints during training on simulation data.
     # On real-world data, no need to create an environment as evaluations are done outside train.py,

@@ -72,7 +72,7 @@ from lerobot.datasets.video_utils import (
     get_safe_default_codec,
     get_video_info,
 )
-
+import torchvision.transforms.functional as TF
 CODEBASE_VERSION = "v2.1"
 
 class LeRobotDatasetMetadata:
@@ -354,9 +354,10 @@ class LeRobotDataset(torch.utils.data.Dataset):
         download_videos: bool = True,
         video_backend: str | None = None,
         batch_encoding_size: int = 1,
-        # 为了控制是否使用真~深度图片而不是采用有损失的视频
-        use_true_depth: bool= False
-        # 控制录制的时候是否保存images文件夹
+        # train:为了控制是否使用真~深度图片而不是采用有损失的视频
+        use_true_depth: bool= False,
+        use_language_tip: bool= False,
+        # record:控制录制的时候是否保存images文件夹
         save_image_folder=False
     ):
         """
@@ -474,7 +475,11 @@ class LeRobotDataset(torch.utils.data.Dataset):
         self.delta_indices = None
         self.batch_encoding_size = batch_encoding_size
         self.episodes_since_last_encoding = 0
+        # 根据train新增，默认是false
         self.use_true_depth=use_true_depth
+        self.use_language_tip=use_language_tip
+        # 根据collect新增，默认是false
+        self.save_image_folder=save_image_folder
 
         # Unused attributes
         self.image_writer = None
@@ -727,7 +732,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         Returns:
             torch.Tensor: Tensor of shape [N, 3, H, W], float32, in [0,1]
         """
-        import torchvision.transforms.functional as TF
+        
 
         # 1. Image directory
         images_dir = self.root / "images" / cam_key / f"episode_{ep_idx:06d}"
@@ -760,7 +765,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         item = {}
         
         for vid_key, query_ts in query_timestamps.items():
-            # 当use_true_depth且vid_key此时含有depth的时候,传入图片index,也就是query_indices
+            # 当use_true_depth且vid_key此时含有depth的时候,传入图片index,直接从本地得到图片
             if self.use_true_depth and "depth" in vid_key:
                 frames = self.read_image_frames_from_disk(
                     vid_key,
@@ -785,7 +790,8 @@ class LeRobotDataset(torch.utils.data.Dataset):
         item = self.hf_dataset[idx]
         ep_idx = item["episode_index"].item()
         
-        # query_indices是
+        # ep_idx相当于episode_idnex，为了定位真实的图片还需要frame_index.
+        # query_indices是某一帧在所有视频里面的位置，不是每个epsiode里面frame的定位
         query_indices = None
         if self.delta_indices is not None:
             query_indices, padding = self._get_query_indices(idx, ep_idx)
@@ -793,6 +799,8 @@ class LeRobotDataset(torch.utils.data.Dataset):
             item = {**item, **padding}
             for key, val in query_result.items():
                 item[key] = val
+            
+        # 每个episode开始的第一帧的query_indices
         episode_start_idx = self.episode_start_indices[ep_idx]
         frame_idx = [
             i - episode_start_idx for i in query_indices['observation.images.side_depth']
@@ -815,11 +823,10 @@ class LeRobotDataset(torch.utils.data.Dataset):
                 item[cam] = self.image_transforms(item[cam])
 
         # Add task as a string
-
-        if self.use_true_depth:
+        if self.use_language_tip:
             # 从本地读取
             if not len(frame_idx) == 1:
-                raise KeyError("说好只读一个呢")
+                raise KeyError("一次getitem应该只获取一个")
             frame_idx=frame_idx[0]
             if hasattr(self, "modified_tasks") and ep_idx in self.modified_tasks and frame_idx in self.modified_tasks[ep_idx]:
                 item["task"] = self.modified_tasks[ep_idx][frame_idx]
@@ -1079,7 +1086,8 @@ class LeRobotDataset(torch.utils.data.Dataset):
             ).parent
             encode_video_frames(img_dir, video_path, self.fps, overwrite=True)
             # 为了使用深度图,不删除
-            # shutil.rmtree(img_dir)
+            if self.save_image_folder == False:
+                shutil.rmtree(img_dir)
 
         # Update video info (only needed when first episode is encoded since it reads from episode 0)
         if len(self.meta.video_keys) > 0 and episode_index == 0:
