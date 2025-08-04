@@ -98,8 +98,6 @@ if IS_LOCAL:
 
 # Matches ".soNNN", optionally followed by "-something", up to the "_buffer_" marker
 _VARIANT_RE = re.compile(r"\.so\d+(?:-[\w]+)?_buffer_")
-
-
 def canonicalise(k: str) -> str:
     """
     Remove dataset-variant markers like '.so100-blue_' or '.so100_' from a
@@ -186,6 +184,7 @@ def load_smolvla(
     if not all(key.startswith(norm_keys) for key in missing) or unexpected:
         raise RuntimeError(
             "SmolVLA %d missing / %d unexpected keys",
+            missing,unexpected,
             len(missing),
             len(unexpected),
         )
@@ -212,12 +211,6 @@ def create_sinusoidal_pos_embedding(
     sin_input = scaling_factor[None, :] * time[:, None]
     pos_emb = torch.cat([torch.sin(sin_input), torch.cos(sin_input)], dim=1)
     return pos_emb
-
-
-def sample_beta(alpha, beta, bsize, device):
-    gamma1 = torch.empty((bsize,), device=device).uniform_(0, 1).pow(1 / alpha)
-    gamma2 = torch.empty((bsize,), device=device).uniform_(0, 1).pow(1 / beta)
-    return gamma1 / (gamma1 + gamma2)
 
 
 def make_att_2d_masks(pad_masks, att_masks):
@@ -381,17 +374,17 @@ class SmolVLAPolicy(PreTrainedPolicy):
         self.model = VLAFlowMatching(config)
         self.reset()
         # 为了能more step
-        self._warmup_steps = 5  # 或从 config 中读取，可改
+        # self._warmup_steps = 5  # 或从 config 中读取，可改
         self._in_warmup = False
-        if self._in_warmup:
-            from simplify_work.obj_dection.detector_api import GroundingDINOProcessor
-            self.obj_detector = GroundingDINOProcessor(
-                text_prompt="The Gripper And The Pyramid-Shaped Sachet",
-                device="cpu",
-            )
-            print("objmodel创建")
-        else: 
-            self.obj_detector=None
+        # if self._in_warmup:
+        #     from simplify_work.obj_dection.detector_api import GroundingDINOProcessor
+        #     self.obj_detector = GroundingDINOProcessor(
+        #         text_prompt="The Gripper And The Pyramid-Shaped Sachet",
+        #         device="cpu",
+        #     )
+        #     print("objmodel创建")
+        # else: 
+        #     self.obj_detector=None
 
 
     def reset(self):
@@ -423,9 +416,19 @@ class SmolVLAPolicy(PreTrainedPolicy):
         return self.parameters()
 
     def _get_action_chunk(self, batch: dict[str, Tensor], noise: Tensor | None = None) -> Tensor:
-        for k in batch:
-            if k in self._queues:
-                batch[k] = torch.stack(list(self._queues[k]), dim=1)
+        import copy
+
+        batch_dict = copy.deepcopy(batch)
+        batch_dict.pop("observation.images.side_depth",None)  # 安全删除，不影响 batch
+
+        # TODO: Check if this for loop is needed.
+        # Context: In fact, self.queues contains only ACTION field, and in inference, we don't have action in the batch
+        # In the case of offline inference, we have the action in the batch
+        # that why without the k != ACTION check, it will raise an error because we are trying to stack
+        # on an empty container.
+        for k in batch_dict:
+            if k in self._queues and k != ACTION:
+                batch_dict[k] = torch.stack(list(self._queues[k]), dim=1)
 
         """
         下面这四行在服务器运行。输入batch，返回actions
@@ -437,13 +440,16 @@ class SmolVLAPolicy(PreTrainedPolicy):
         """
         # 开启服务器推理。本地使用这个，并且注释掉后面四行。
         if IS_LOCAL:
-            actions=predict_from_server(batch)
+            actions=predict_from_server(batch_dict)
         else:
         # 服务器就注释掉上面一行，使用下面四行。
 
-            images, img_masks = self.prepare_images(batch)
-            state = self.prepare_state(batch)
-            lang_tokens, lang_masks = self.prepare_language(batch)
+        
+            # 0731临时修改
+
+            images, img_masks = self.prepare_images(batch_dict)
+            state = self.prepare_state(batch_dict)
+            lang_tokens, lang_masks = self.prepare_language(batch_dict)
             actions = self.model.sample_actions(images, img_masks, lang_tokens, lang_masks, state, noise=noise)
 
         # Unpad actions
@@ -497,7 +503,6 @@ class SmolVLAPolicy(PreTrainedPolicy):
 
             # `self.predict_action_chunk` returns a (batch_size, n_action_steps, action_dim) tensor, but the queue
             # effectively has shape (n_action_steps, batch_size, *), hence the transpose.
-            print("no data,计算")
             self._queues[ACTION].extend(actions.transpose(0, 1)[: self.config.n_action_steps])
 
         """
@@ -505,36 +510,39 @@ class SmolVLAPolicy(PreTrainedPolicy):
         """
 
         # --- Warmup 阶段逻辑 ---
-        if self._in_warmup:
-            # 获取目标距离
-            distance = self.obj_detector.count_distance(batch["observation.images.side"],batch["observation.images.side_depth"])
+        # if self._in_warmup:
+        #     # 获取目标距离
+        #     distance = count_distance(batch["observation.images.side"],batch["observation.images.side_depth"])
 
-            # 根据距离设置 warmup 步数
-            if distance >= 2:
-                warmup_n = 5  # 区间 A: 远距离，执行 5 步
-            elif distance >= 1:
-                warmup_n = 3  # 区间 B: 中距离，执行 3 步
-            else:
-                warmup_n = 1  # 区间 C: 近距离，执行 1 步
+        #     # 根据距离设置 warmup 步数
+        #     if distance is None:
+        #         warmup_n=1
+        #     else:
+        #         if distance >= 0.2:
+        #             warmup_n = 5  # 区间 A: 远距离，执行 5 步
+        #         elif distance >= 0.1:
+        #             warmup_n = 3  # 区间 B: 中距离，执行 3 步
+        #         else:
+        #             warmup_n = 1  # 区间 C: 近距离，执行 1 步
 
-            # 如果 queue 中不足 N 个，就提前补充
-            while len(self._queues[ACTION]) < warmup_n:
-                actions = self._get_action_chunk(batch, noise)
-                self._queues[ACTION].extend(actions.transpose(0, 1)[: self.config.n_action_steps])
+        #     # 如果 queue 中不足 N 个，就提前补充
+        #     while len(self._queues[ACTION]) < warmup_n:
+        #         actions = self._get_action_chunk(batch, noise)
+        #         self._queues[ACTION].extend(actions.transpose(0, 1)[: self.config.n_action_steps])
 
-            # 取出 N 个动作做加权平均
-            action_list = [self._queues[ACTION].popleft() for _ in range(warmup_n)]
-            actions = torch.stack(action_list, dim=1)  # [B, N, D]
+        #     # 取出 N 个动作做加权平均
+        #     action_list = [self._queues[ACTION].popleft() for _ in range(warmup_n)]
+        #     actions = torch.stack(action_list, dim=1)  # [B, N, D]
 
-            # 加权平均
-            weights = torch.linspace(1.0, 0.5, steps=warmup_n, device=actions.device)
-            weights = weights / weights.sum()
-            weights = weights.view(1, -1, 1)  # [1, N, 1]
+        #     # 加权平均
+        #     weights = torch.linspace(1.0, 0.5, steps=warmup_n, device=actions.device)
+        #     weights = weights / weights.sum()
+        #     weights = weights.view(1, -1, 1)  # [1, N, 1]
 
-            weighted_action = (actions * weights).sum(dim=1)  # [B, D]
-            print(f"[Warmup] 距离: {distance:.3f}, 动作步数: {warmup_n},  剩余queue: {len(self._queues[ACTION])}")
-            return weighted_action
-        print(f"走一步,剩余queue: {len(self._queues[ACTION])}")
+        #     weighted_action = (actions * weights).sum(dim=1)  # [B, D]
+        #     print(f"[Warmup] 距离: {distance}, 动作步数: {warmup_n},  剩余queue: {len(self._queues[ACTION])}")
+        #     return weighted_action
+        # print(f"走一步,剩余queue: {len(self._queues[ACTION])}")
         return self._queues[ACTION].popleft()
 
     def forward(self, batch: dict[str, Tensor], noise=None, time=None) -> dict[str, Tensor]:
@@ -722,7 +730,7 @@ class VLAFlowMatching(nn.Module):
     └──────────────────────────────┘
     """
 
-    def __init__(self, config):
+    def __init__(self, config: SmolVLAConfig):
         super().__init__()
         self.config = config
 
@@ -776,9 +784,10 @@ class VLAFlowMatching(nn.Module):
         return noise
 
     def sample_time(self, bsize, device):
-        time_beta = sample_beta(1.5, 1.0, bsize, device)
+        beta_dist = torch.distributions.Beta(concentration1=1.5, concentration0=1.0)
+        time_beta = beta_dist.sample((bsize,)).to(device=device, dtype=torch.float32)
         time = time_beta * 0.999 + 0.001
-        return time.to(dtype=torch.float32, device=device)
+        return time
 
     def embed_prefix(
         self, images, img_masks, lang_tokens, lang_masks, state: torch.Tensor = None

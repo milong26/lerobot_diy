@@ -11,11 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import builtins
 import datetime as dt
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Type
 
 import draccus
 from huggingface_hub import hf_hub_download
@@ -69,6 +69,7 @@ class TrainPipelineConfig(HubMixin):
     use_depth_image: bool=False
     use_force: bool=False
     use_language_tip: bool=False
+    use_true_depth: bool=False
 
     def __post_init__(self):
         self.checkpoint_path = None
@@ -79,7 +80,11 @@ class TrainPipelineConfig(HubMixin):
         if policy_path:
             # Only load the policy config
             cli_overrides = parser.get_cli_overrides("policy")
-            self.policy = PreTrainedConfig.from_pretrained(policy_path, cli_overrides=cli_overrides)
+            self.policy = PreTrainedConfig.from_pretrained(
+                policy_path, 
+                cli_overrides=cli_overrides,
+                # max_memory={0: "16GiB"}
+                )
             self.policy.pretrained_path = policy_path
         elif self.resume:
             # The entire train config is already loaded, we just need to get the checkpoint dir
@@ -141,7 +146,7 @@ class TrainPipelineConfig(HubMixin):
 
     @classmethod
     def from_pretrained(
-        cls: Type["TrainPipelineConfig"],
+        cls: builtins.type["TrainPipelineConfig"],
         pretrained_name_or_path: str | Path,
         *,
         force_download: bool = False,

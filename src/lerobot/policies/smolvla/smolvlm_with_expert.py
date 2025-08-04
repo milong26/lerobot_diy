@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import copy
-from typing import List, Optional
 
 import torch
 from torch import nn
@@ -81,6 +80,7 @@ class SmolVLMWithExpertModel(nn.Module):
                 device_map="auto",
                 torch_dtype="bfloat16",
                 low_cpu_mem_usage=True,
+                # max_memory={0: "10GiB"}
             )
             config = self.vlm.config
         else:
@@ -404,12 +404,12 @@ class SmolVLMWithExpertModel(nn.Module):
 
     def forward(
         self,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional[List[torch.FloatTensor]] = None,
-        inputs_embeds: List[torch.FloatTensor] = None,
-        use_cache: Optional[bool] = None,
-        fill_kv_cache: Optional[bool] = None,
+        attention_mask: torch.Tensor | None = None,
+        position_ids: torch.LongTensor | None = None,
+        past_key_values: list[torch.FloatTensor] | None = None,
+        inputs_embeds: list[torch.FloatTensor] = None,
+        use_cache: bool | None = None,
+        fill_kv_cache: bool | None = None,
     ):
         models = [self.get_vlm_model().text_model, self.lm_expert]
         model_layers = self.get_model_layers(models)

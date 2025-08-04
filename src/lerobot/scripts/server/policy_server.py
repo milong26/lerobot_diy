@@ -49,21 +49,21 @@ from lerobot.scripts.server.helpers import (
     get_logger,
     observations_similar,
     raw_observation_to_observation,
-    receive_bytes_in_chunks,
 )
 from lerobot.transport import (
-    async_inference_pb2,  # type: ignore
-    async_inference_pb2_grpc,  # type: ignore
+    services_pb2,  # type: ignore
+    services_pb2_grpc,  # type: ignore
 )
+from lerobot.transport.utils import receive_bytes_in_chunks
 
 
-class PolicyServer(async_inference_pb2_grpc.AsyncInferenceServicer):
+class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
     prefix = "policy_server"
     logger = get_logger(prefix)
 
     def __init__(self, config: PolicyServerConfig):
         self.config = config
-        self._running_event = threading.Event()
+        self.shutdown_event = threading.Event()
 
         # FPS measurement
         self.fps_tracker = FPSTracker(target_fps=config.fps)
@@ -81,10 +81,20 @@ class PolicyServer(async_inference_pb2_grpc.AsyncInferenceServicer):
         self.lerobot_features = None
         self.actions_per_chunk = None
         self.policy = None
+        
+        # 如果推理的时候需要用distance
+        # TODO 后面要测试language的话也要加载，暂时没想好api怎么写
+        self.count_distance = False
+        if self.count_distance:
+            from simplify_work.obj_dection.detector_api import YOLOProcessor
+            self.obj_detector = YOLOProcessor()
+        else:
+            self.obj_detector = None
+
 
     @property
     def running(self):
-        return self._running_event.is_set()
+        return not self.shutdown_event.is_set()
 
     @property
     def policy_image_features(self):
@@ -93,7 +103,7 @@ class PolicyServer(async_inference_pb2_grpc.AsyncInferenceServicer):
     def _reset_server(self) -> None:
         """Flushes server state when new client connects."""
         # only running inference on the latest observation received by the server
-        self._running_event.clear()
+        self.shutdown_event.set()
         self.observation_queue = Queue(maxsize=1)
 
         with self._predicted_timesteps_lock:
@@ -103,16 +113,16 @@ class PolicyServer(async_inference_pb2_grpc.AsyncInferenceServicer):
         client_id = context.peer()
         self.logger.info(f"Client {client_id} connected and ready")
         self._reset_server()
-        self._running_event.set()
+        self.shutdown_event.clear()
 
-        return async_inference_pb2.Empty()
+        return services_pb2.Empty()
 
     def SendPolicyInstructions(self, request, context):  # noqa: N802
         """Receive policy instructions from the robot client"""
 
         if not self.running:
             self.logger.warning("Server is not running. Ignoring policy instructions.")
-            return async_inference_pb2.Empty()
+            return services_pb2.Empty()
 
         client_id = context.peer()
 
@@ -149,8 +159,10 @@ class PolicyServer(async_inference_pb2_grpc.AsyncInferenceServicer):
 
         self.logger.info(f"Time taken to put policy on {self.device}: {end - start:.4f} seconds")
 
-        return async_inference_pb2.Empty()
+        return services_pb2.Empty()
 
+
+    # 服务器接收并反序列化observation
     def SendObservations(self, request_iterator, context):  # noqa: N802
         """Receive observations from the robot client"""
         client_id = context.peer()
@@ -159,7 +171,7 @@ class PolicyServer(async_inference_pb2_grpc.AsyncInferenceServicer):
         receive_time = time.time()  # comparing timestamps so need time.time()
         start_deserialize = time.perf_counter()
         received_bytes = receive_bytes_in_chunks(
-            request_iterator, self._running_event, self.logger
+            request_iterator, None, self.shutdown_event, self.logger
         )  # blocking call while looping over request_iterator
         timed_observation = pickle.loads(received_bytes)  # nosec
         deserialize_time = time.perf_counter() - start_deserialize
@@ -190,7 +202,7 @@ class PolicyServer(async_inference_pb2_grpc.AsyncInferenceServicer):
         ):
             self.logger.info(f"Observation #{obs_timestep} has been filtered out")
 
-        return async_inference_pb2.Empty()
+        return services_pb2.Empty()
 
     def GetActions(self, request, context):  # noqa: N802
         """Returns actions to the robot client. Actions are sent as a single
@@ -209,16 +221,41 @@ class PolicyServer(async_inference_pb2_grpc.AsyncInferenceServicer):
             with self._predicted_timesteps_lock:
                 self._predicted_timesteps.add(obs.get_timestep())
 
+
+            # 计算distance
+            try:
+                print("obs.get_observation的内容",obs.get_observation())
+                depth_tensor = obs.get_observation()["observation.images.side_depth"]
+                rgb_tensor=obs.get_observation()["observation.images.side"]
+                print("depth_tensor实际的树脂",depth_tensor)
+                if self.use_distance and self.obj_detector is not None:
+                    distances = self.obj_detector.count_distance(depth_tensor, depth_tensor)
+                else:
+                    distances= None
+                # distance=None:
+                if distance is None:
+                    # 按照距离最近改成0
+                    distance=0
+
+                raise KeyError("确认depth_tensor的内容")
+                depth_np = depth_tensor.cpu().numpy()
+                distance = compute_distance_from_depth(depth_np)
+            except Exception as e:
+                self.logger.warning(f"Failed to compute distance: {e}")
+                distance = -1.0  # fallback 值
+
             start_time = time.perf_counter()
             action_chunk = self._predict_action_chunk(obs)
             inference_time = time.perf_counter() - start_time
 
             start_time = time.perf_counter()
-            actions_bytes = pickle.dumps(action_chunk)  # nosec
+            # actions_bytes = pickle.dumps(action_chunk)  # nosec
+            # 打包actionchunk+distance
+            actions_bytes = pickle.dumps((action_chunk, distance))  # nosec
             serialize_time = time.perf_counter() - start_time
 
             # Create and return the action chunk
-            actions = async_inference_pb2.Actions(data=actions_bytes)
+            actions = services_pb2.Actions(data=actions_bytes)
 
             self.logger.info(
                 f"Action chunk #{obs.get_timestep()} generated | "
@@ -239,22 +276,24 @@ class PolicyServer(async_inference_pb2_grpc.AsyncInferenceServicer):
             return actions
 
         except Empty:  # no observation added to queue in obs_queue_timeout
-            return async_inference_pb2.Empty()
+            return services_pb2.Empty()
 
         except Exception as e:
             self.logger.error(f"Error in StreamActions: {e}")
 
-            return async_inference_pb2.Empty()
+            return services_pb2.Empty()
 
     def _obs_sanity_checks(self, obs: TimedObservation, previous_obs: TimedObservation) -> bool:
         """Check if the observation is valid to be processed by the policy"""
         with self._predicted_timesteps_lock:
             predicted_timesteps = self._predicted_timesteps
 
+        # 当前timestamp已经预测过
         if obs.get_timestep() in predicted_timesteps:
             self.logger.debug(f"Skipping observation #{obs.get_timestep()} - Timestep predicted already!")
             return False
-
+        
+        # observation和上一个近似。
         elif observations_similar(obs, previous_obs, lerobot_features=self.lerobot_features):
             self.logger.debug(
                 f"Skipping observation #{obs.get_timestep()} - Observation too similar to last obs predicted!"
@@ -388,7 +427,7 @@ def serve(cfg: PolicyServerConfig):
 
     # Setup and start gRPC server
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
-    async_inference_pb2_grpc.add_AsyncInferenceServicer_to_server(policy_server, server)
+    services_pb2_grpc.add_AsyncInferenceServicer_to_server(policy_server, server)
     server.add_insecure_port(f"{cfg.host}:{cfg.port}")
 
     policy_server.logger.info(f"PolicyServer started on {cfg.host}:{cfg.port}")

@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import abc
+import builtins
 import json
 import logging
 import os
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Type, TypeVar
+from typing import TypeVar
 
 import draccus
 from huggingface_hub import hf_hub_download
@@ -31,7 +32,6 @@ from lerobot.optim.schedulers import LRSchedulerConfig
 from lerobot.utils.hub import HubMixin
 from lerobot.utils.utils import auto_select_torch_device, is_amp_available, is_torch_device_available
 
-# Generic variable that is either PreTrainedConfig or a subclass thereof
 T = TypeVar("T", bound="PreTrainedConfig")
 
 
@@ -148,7 +148,7 @@ class PreTrainedConfig(draccus.ChoiceRegistry, HubMixin, abc.ABC):
 
     @classmethod
     def from_pretrained(
-        cls: Type[T],
+        cls: builtins.type[T],
         pretrained_name_or_path: str | Path,
         *,
         force_download: bool = False,
@@ -164,13 +164,12 @@ class PreTrainedConfig(draccus.ChoiceRegistry, HubMixin, abc.ABC):
         config_file: str | None = None
         print(model_id)
         if Path(model_id).is_dir():
-            print("path is dir")
             if CONFIG_NAME in os.listdir(model_id):
                 config_file = os.path.join(model_id, CONFIG_NAME)
             else:
                 print(f"{CONFIG_NAME} not found in {Path(model_id).resolve()}")
         else:
-            raise KeyError("本地没有模型文件")
+            raise KeyError("本地没有模型文件:",model_id)
             try:
                 config_file = hf_hub_download(
                     repo_id=model_id,

@@ -19,7 +19,7 @@ Provides the RealSenseCamera class for capturing frames from Intel RealSense cam
 import logging
 import time
 from threading import Event, Lock, Thread
-from typing import Any, Dict, List
+from typing import Any
 
 import cv2
 import numpy as np
@@ -197,7 +197,7 @@ class RealSenseCamera(Camera):
         logger.info(f"{self} connected.")
 
     @staticmethod
-    def find_cameras() -> List[Dict[str, Any]]:
+    def find_cameras() -> list[dict[str, Any]]:
         """
         Detects available Intel RealSense cameras connected to the system.
 
@@ -395,6 +395,18 @@ class RealSenseCamera(Camera):
 
         return color_image_processed
 
+    def encode_depth_to_rgb(self,depth_uint16):
+        """将16位深度编码为RGB三通道图像"""
+        # 确保depth_uint16是uint16格式
+        depth_uint16 = depth_uint16.astype(np.uint16)
+
+        # 拆分高8位和低8位
+        r = (depth_uint16 >> 8).astype(np.uint8)
+        g = (depth_uint16 & 0xFF).astype(np.uint8)
+        b = np.zeros_like(r, dtype=np.uint8)  # B通道置0
+        # 合成3通道图像
+        rgb_image = cv2.merge((r, g, b))  # OpenCV用BGR顺序，注意这里为了方便读取，放成B,G,R
+        return rgb_image
 
 
 
@@ -477,12 +489,10 @@ class RealSenseCamera(Camera):
             #         )
             # c=3
         if depth_frame:
-            h, w = image.shape
-            image = cv2.applyColorMap(
-                    cv2.convertScaleAbs(image, alpha=0.03),
-                    cv2.COLORMAP_JET
-                    )
-            c=3
+            image = self.encode_depth_to_rgb(image)  # 得到RGB格式的编码图
+            # 这里的image是RGB格式，dtype uint8，3通道
+            # return image  # 返回编码后的图像
+            h, w,c = image.shape
         else:
             h, w, c = image.shape
 

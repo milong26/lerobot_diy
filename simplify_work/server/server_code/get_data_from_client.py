@@ -39,7 +39,7 @@ def load_and_warmup_model():
     ):
         # Convert to pytorch format: channel first and float32 in [0,1] with batch dimension
         for name in observation:
-            if isinstance(observation[name], np.ndarray):  # ✅ 只处理 numpy 数组
+            if isinstance(observation[name], np.ndarray):  # 只处理 numpy 数组
                 observation[name] = torch.from_numpy(observation[name])
                 if "image" in name:
                     observation[name] = observation[name].type(torch.float32) / 255
