@@ -37,7 +37,7 @@ robot:
 display_data: false
 
 dataset:
-  repo_id: 0729eval/eval_firts50_can_skip
+  repo_id: 0803eval/eval_no_red
   num_episodes: 1
   single_task: "pick up the pyramid-shaped sachet and place it into the box."
   episode_time_s: 60

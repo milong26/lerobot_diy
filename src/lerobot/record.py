@@ -150,6 +150,7 @@ class DatasetRecordConfig:
     # Number of episodes to record before batch encoding videos
     # Set to 1 for immediate encoding (default behavior), or higher for batched encoding
     video_encoding_batch_size: int = 1
+    save_image_folder: bool=True
 
     def __post_init__(self):
         if self.single_task is None:

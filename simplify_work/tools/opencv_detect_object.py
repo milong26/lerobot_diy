@@ -1,3 +1,7 @@
+"""
+lerobot_dit$ python simplify_work/opencv_detect_object.py
+打开三个窗口，标注黄色和红色物体并输出中心点相对机械臂坐标的3d位置
+"""
 import pyrealsense2 as rs
 import cv2
 import numpy as np
