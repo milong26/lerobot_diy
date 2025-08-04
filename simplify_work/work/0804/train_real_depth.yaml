@@ -2,7 +2,7 @@
 
 # 改用这个
 # nohup env CUDA_VISIBLE_DEVICES=2 HF_HUB_OFFLINE=1 PYTHONPATH=src   python -m lerobot.scripts.train   --config_path=simplify_work/work/train/train_0727_pickplace_100_language.yaml   --policy.path=models/forsmolvla/smolvla_base   --policy.repo_id=lerobot/smolvla_base   > logs/0727/train_100_depth_lang.log 2>&1 &
-# 查看
+# 训练depth要保证：1 训练的input feature有depth image 2 用depth image好还是用伪深度？
 
 dataset:
   repo_id: lerobot/svla_so101_pickplace
@@ -10,8 +10,8 @@ dataset:
 
 batch_size: 64
 steps: 20000
-output_dir: outputs/train/0804/baseline_100
-job_name: training_pickplace_with_first100_baseline
+output_dir: outputs/train/0804/real_depth_100
+job_name: training_pickplace_with_first100_real_depth
 wandb:
   enable: false
 
@@ -20,7 +20,7 @@ policy:
   repo_id: lerobot/smolvla_base
   type: smolvla
 
-use_depth_image: false
+use_depth_image: true
 use_force: false
 use_language_tip: false
-use_true_depth: false
+use_true_depth: true
