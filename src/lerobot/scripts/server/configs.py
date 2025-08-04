@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 import torch
 
@@ -145,6 +145,13 @@ class RobotClientConfig:
     verify_robot_cameras: bool = field(
         default=True, metadata={"help": "Verify that the robot cameras match the policy cameras"}
     )
+
+    # 默认的动作参数
+    high_distance_threshold: float = 1.0
+    low_distance_threshold: float = 0.5
+    high_distance_action_aggregate: int = 5
+    low_distance_action_aggregate: int = 3
+
 
     @property
     def environment_dt(self) -> float:

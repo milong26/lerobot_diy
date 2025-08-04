@@ -36,10 +36,11 @@ import logging
 import pickle  # nosec
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import asdict
 from pprint import pformat
 from queue import Queue
-from typing import Any, Callable, Optional
+from typing import Any
 
 import draccus
 import grpc
@@ -68,14 +69,14 @@ from lerobot.scripts.server.helpers import (
     TimedObservation,
     get_logger,
     map_robot_keys_to_lerobot_features,
-    send_bytes_in_chunks,
     validate_robot_cameras_for_policy,
     visualize_action_queue_size,
 )
 from lerobot.transport import (
-    async_inference_pb2,  # type: ignore
-    async_inference_pb2_grpc,  # type: ignore
+    services_pb2,  # type: ignore
+    services_pb2_grpc,  # type: ignore
 )
+from lerobot.transport.utils import grpc_channel_options, send_bytes_in_chunks
 
 
 class RobotClient:
@@ -113,11 +114,13 @@ class RobotClient:
             config.actions_per_chunk,
             config.policy_device,
         )
-        self.channel = grpc.insecure_channel(self.server_address)
-        self.stub = async_inference_pb2_grpc.AsyncInferenceStub(self.channel)
+        self.channel = grpc.insecure_channel(
+            self.server_address, grpc_channel_options(initial_backoff=f"{config.environment_dt:.4f}s")
+        )
+        self.stub = services_pb2_grpc.AsyncInferenceStub(self.channel)
         self.logger.info(f"Initializing client to connect to server at {self.server_address}")
 
-        self._running_event = threading.Event()
+        self.shutdown_event = threading.Event()
 
         # Initialize client side variables
         self.latest_action_lock = threading.Lock()
@@ -139,23 +142,26 @@ class RobotClient:
         # Use an event for thread-safe coordination
         self.must_go = threading.Event()
         self.must_go.set()  # Initially set - observations qualify for direct processing
+        # 距离
+        self.latest_distance = None 
 
     @property
     def running(self):
-        return self._running_event.is_set()
+        return not self.shutdown_event.is_set()
 
+    # 连接到服务器，并发送policy设置，
     def start(self):
         """Start the robot client and connect to the policy server"""
         try:
             # client-server handshake
             start_time = time.perf_counter()
-            self.stub.Ready(async_inference_pb2.Empty())
+            self.stub.Ready(services_pb2.Empty())
             end_time = time.perf_counter()
             self.logger.debug(f"Connected to policy server in {end_time - start_time:.4f}s")
 
             # send policy instructions
             policy_config_bytes = pickle.dumps(self.policy_config)
-            policy_setup = async_inference_pb2.PolicySetup(data=policy_config_bytes)
+            policy_setup = services_pb2.PolicySetup(data=policy_config_bytes)
 
             self.logger.info("Sending policy instructions to policy server")
             self.logger.debug(
@@ -165,8 +171,9 @@ class RobotClient:
             )
 
             self.stub.SendPolicyInstructions(policy_setup)
+            print("start发送完模型config了")
 
-            self._running_event.set()
+            self.shutdown_event.clear()
 
             return True
 
@@ -176,7 +183,7 @@ class RobotClient:
 
     def stop(self):
         """Stop the robot client"""
-        self._running_event.clear()
+        self.shutdown_event.set()
 
         self.robot.disconnect()
         self.logger.debug("Robot disconnected")
@@ -204,7 +211,7 @@ class RobotClient:
         try:
             observation_iterator = send_bytes_in_chunks(
                 observation_bytes,
-                async_inference_pb2.Observation,
+                services_pb2.Observation,
                 log_prefix="[CLIENT] Observation",
                 silent=True,
             )
@@ -224,11 +231,13 @@ class RobotClient:
             timestamps = sorted([action.get_timestep() for action in self.action_queue.queue])
         self.logger.debug(f"Queue size: {queue_size}, Queue contents: {timestamps}")
         return queue_size, timestamps
+    
 
+    # 服务器传来的action要不要放到action_queue里面
     def _aggregate_action_queues(
         self,
         incoming_actions: list[TimedAction],
-        aggregate_fn: Optional[Callable[[torch.Tensor, torch.Tensor], torch.Tensor]] = None,
+        aggregate_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] | None = None,
     ):
         """Finds the same timestep actions in the queue and aggregates them using the aggregate_fn"""
         if aggregate_fn is None:
@@ -279,7 +288,7 @@ class RobotClient:
         while self.running:
             try:
                 # Use StreamActions to get a stream of actions from the server
-                actions_chunk = self.stub.GetActions(async_inference_pb2.Empty())
+                actions_chunk = self.stub.GetActions(services_pb2.Empty())
                 if len(actions_chunk.data) == 0:
                     continue  # received `Empty` from server, wait for next call
 
@@ -287,7 +296,13 @@ class RobotClient:
 
                 # Deserialize bytes back into list[TimedAction]
                 deserialize_start = time.perf_counter()
-                timed_actions = pickle.loads(actions_chunk.data)  # nosec
+
+                # timed_actions = pickle.loads(actions_chunk.data)  # nosec
+                # 改成action,distance
+                timed_actions, distance = pickle.loads(actions_chunk.data)  # 假设现在是个 tuple
+                self.latest_distance = distance
+
+                
                 deserialize_time = time.perf_counter() - deserialize_start
 
                 self.action_chunk_size = max(self.action_chunk_size, len(timed_actions))
@@ -364,27 +379,65 @@ class RobotClient:
     def control_loop_action(self, verbose: bool = False) -> dict[str, Any]:
         """Reading and performing actions in local queue"""
 
+        # 根据distance决定一次趣N个动作
+        distance = self.latest_distance or 0  # default to 0 if not set
+
+        # 决定取几个动作
+        if distance > self.config.high_distance_threshold:
+            num_actions = self.config.high_distance_action_aggregate  # e.g. 5
+        elif distance > self.config.low_distance_threshold:
+            num_actions = self.config.low_distance_action_aggregate  # e.g. 3
+        else:
+            num_actions = 1
+
         # Lock only for queue operations
         get_start = time.perf_counter()
+
+        # 一次取一个，线程安全地获取队列中的动作
+        timed_actions = []
         with self.action_queue_lock:
-            self.action_queue_size.append(self.action_queue.qsize())
+
+            # self.action_queue_size.append(self.action_queue.qsize())
             # Get action from queue
-            timed_action = self.action_queue.get_nowait()
+            # timed_action = self.action_queue.get_nowait()
+            # 一次取num_actions个
+            for _ in range(min(num_actions, self.action_queue.qsize())):
+                timed_actions.append(self.action_queue.get_nowait())
+            self.action_queue_size.append(self.action_queue.qsize())
+
+        if not timed_actions:
+            return {}
+        
+        # 平均动作
+        if len(timed_actions) == 1:
+            averaged_action = timed_actions[0]
+        else:
+            # stack tensors
+            action_stack = torch.stack([ta.get_action() for ta in timed_actions])
+            mean_action_tensor = torch.mean(action_stack, dim=0)
+
+            averaged_action = TimedAction(
+                timestamp=timed_actions[-1].get_timestamp(),
+                timestep=timed_actions[-1].get_timestep(),
+                action=mean_action_tensor,
+            )
+
         get_end = time.perf_counter() - get_start
 
+        # 给robot实际运行的action指令
         _performed_action = self.robot.send_action(
-            self._action_tensor_to_action_dict(timed_action.get_action())
+            self._action_tensor_to_action_dict(averaged_action.get_action())
         )
         with self.latest_action_lock:
-            self.latest_action = timed_action.get_timestep()
+            self.latest_action = averaged_action.get_timestep()
 
         if verbose:
             with self.action_queue_lock:
                 current_queue_size = self.action_queue.qsize()
 
             self.logger.debug(
-                f"Ts={timed_action.get_timestamp()} | "
-                f"Action #{timed_action.get_timestep()} performed | "
+                f"Ts={averaged_action.get_timestamp()} | "
+                f"Action #{averaged_action.get_timestep()} performed | "
                 f"Queue size: {current_queue_size}"
             )
 
