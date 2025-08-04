@@ -57,34 +57,60 @@ import os
 # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
+
+# # train.py 开头
+# import os
+
+# import torch.multiprocessing as mp
+# mp.set_start_method("spawn", force=True)
+
+
 # 为了filter raw dataset
+import json
+from pathlib import Path
+
 class FilteredBatchLoader:
-    def __init__(self, dataloader, exclude_keys: list, obj_detector=None):
+    def __init__(self, dataloader, exclude_keys: list, obj_detector=None, save_task_path='training_dataset/0727pickplace/first100/meta/modified_tasks.jsonl'):
         self.dataloader = dataloader
         self.exclude_keys = set(exclude_keys)
-        self.obj_detector = obj_detector  # 新增
+        self.obj_detector = obj_detector
+        self.save_task_path = Path(save_task_path) if save_task_path else None
+        # if self.save_task_path:
+        #     self.save_task_path.parent.mkdir(parents=True, exist_ok=True)
+        #     self.task_f = open(self.save_task_path, "a")  # 以 append 模式写入
+    
+    def __del__(self):
+        if hasattr(self, "task_f") and not self.task_f.closed:
+            self.task_f.close()
 
     def __iter__(self):
         for batch in self.dataloader:
-            # print("第几个batch")
-            # 先过滤掉无用字段
             filtered_batch = {k: v for k, v in batch.items() if k not in self.exclude_keys}
 
-            # 如果有 obj_detector，就处理每张图
             if self.obj_detector is not None:
-                # images都是tensor格式的
-                images = filtered_batch["observation.images.side"]            # [B, C, H, W]
-                depths = filtered_batch["observation.images.side_depth"]      # [B, 1, H, W]
-                tasks = filtered_batch["task"]                                 # list[str] or tensor of strings
-                # new_tasks: list[str]，和原始 tasks 长度一致
+                images = filtered_batch["observation.images.side"]
+                depths = filtered_batch["observation.images.side_depth"]
+                tasks = filtered_batch["task"]
+
                 new_tasks = self.obj_detector.add_depth_info_to_task(images, depths, tasks)
-                filtered_batch["task"] = new_tasks  # 覆盖原 task
+                filtered_batch["task"] = new_tasks
+
+                #  保存每帧的修改后task
+                if self.save_task_path:
+                    ep_indices = filtered_batch["episode_index"]
+                    frame_indices = filtered_batch["frame_index"]
+                    for ep, frame, task in zip(ep_indices, frame_indices, new_tasks):
+                        record = {
+                            "episode_index": int(ep.item()),
+                            "frame_index": int(frame.item()),
+                            "task": task,
+                        }
+                        self.task_f.write(json.dumps(record) + "\n")
+
                 self.obj_detector.print_statistics()
 
             yield filtered_batch
 
-    def __len__(self):
-        return len(self.dataloader)
 
 
 
@@ -160,6 +186,7 @@ def train(cfg: TrainPipelineConfig):
     torch.backends.cuda.matmul.allow_tf32 = True
 
     logging.info("Creating dataset")
+    # make_dataset接收的就是cfg
     dataset = make_dataset(cfg)
 
     # Create environment used for evaluating checkpoints during training on simulation data.
@@ -170,32 +197,32 @@ def train(cfg: TrainPipelineConfig):
         logging.info("Creating env")
         eval_env = make_env(cfg.env, n_envs=cfg.eval.batch_size, use_async_envs=cfg.eval.use_async_envs)
 
-    # logging.info("Creating policy")
-    # policy = make_policy(
-    #     cfg=cfg.policy,
-    #     ds_meta=dataset.meta,
-    # )
+    logging.info("Creating policy")
+    policy = make_policy(
+        cfg=cfg.policy,
+        ds_meta=dataset.meta,
+    )
 
-    # logging.info("Creating optimizer and scheduler")
-    # optimizer, lr_scheduler = make_optimizer_and_scheduler(cfg, policy)
-    # grad_scaler = GradScaler(device.type, enabled=cfg.policy.use_amp)
+    logging.info("Creating optimizer and scheduler")
+    optimizer, lr_scheduler = make_optimizer_and_scheduler(cfg, policy)
+    grad_scaler = GradScaler(device.type, enabled=cfg.policy.use_amp)
 
     step = 0  # number of policy updates (forward + backward + optim)
 
-    # if cfg.resume:
-    #     step, optimizer, lr_scheduler = load_training_state(cfg.checkpoint_path, optimizer, lr_scheduler)
+    if cfg.resume:
+        step, optimizer, lr_scheduler = load_training_state(cfg.checkpoint_path, optimizer, lr_scheduler)
 
-    # num_learnable_params = sum(p.numel() for p in policy.parameters() if p.requires_grad)
-    # num_total_params = sum(p.numel() for p in policy.parameters())
+    num_learnable_params = sum(p.numel() for p in policy.parameters() if p.requires_grad)
+    num_total_params = sum(p.numel() for p in policy.parameters())
 
-    # logging.info(colored("Output dir:", "yellow", attrs=["bold"]) + f" {cfg.output_dir}")
-    # if cfg.env is not None:
-    #     logging.info(f"{cfg.env.task=}")
-    # logging.info(f"{cfg.steps=} ({format_big_number(cfg.steps)})")
-    # logging.info(f"{dataset.num_frames=} ({format_big_number(dataset.num_frames)})")
-    # logging.info(f"{dataset.num_episodes=}")
-    # logging.info(f"{num_learnable_params=} ({format_big_number(num_learnable_params)})")
-    # logging.info(f"{num_total_params=} ({format_big_number(num_total_params)})")
+    logging.info(colored("Output dir:", "yellow", attrs=["bold"]) + f" {cfg.output_dir}")
+    if cfg.env is not None:
+        logging.info(f"{cfg.env.task=}")
+    logging.info(f"{cfg.steps=} ({format_big_number(cfg.steps)})")
+    logging.info(f"{dataset.num_frames=} ({format_big_number(dataset.num_frames)})")
+    logging.info(f"{dataset.num_episodes=}")
+    logging.info(f"{num_learnable_params=} ({format_big_number(num_learnable_params)})")
+    logging.info(f"{num_total_params=} ({format_big_number(num_total_params)})")
 
     if hasattr(cfg.policy, "drop_n_last_frames"):
         shuffle = False
@@ -212,7 +239,7 @@ def train(cfg: TrainPipelineConfig):
         dataset,
         num_workers=cfg.num_workers,
         batch_size=cfg.batch_size,
-        shuffle=shuffle,
+        shuffle=False,
         sampler=sampler,
         pin_memory=device.type == "cuda",
         drop_last=False,
@@ -224,50 +251,55 @@ def train(cfg: TrainPipelineConfig):
     if not cfg.use_force:
         exclude_features += ["observation.force", "observation.force_is_pad"]
     obj_detector = None
-    if cfg.use_language_tip:
-        from simplify_work.obj_dection.obj_detector_api import YOLOProcessor
-        obj_detector = YOLOProcessor(
-            device="cuda",
-        )
+    # 显存足够的情况下可以这么搞(虽然有一点误差),现在改成本地文件了
+    # if cfg.use_language_tip:
+    #     from simplify_work.obj_dection.detector_api import YOLOProcessor
+    #     obj_detector = YOLOProcessor()
+
+    """
+    保存图片到本地
+    """
+
+
 
 
     # 包装 dataloader
     dataloader = FilteredBatchLoader(raw_dataloader, exclude_features, obj_detector=obj_detector)
-    peek_batch = next(iter(dataloader))
-    print("task示例",peek_batch["task"])
+
+    # 测试
+    # peek_batch = next(iter(dataloader))
     # print("真正训练的时候甬道的feature：", list(peek_batch.keys()))
-    raise KeyError("测试task")
+    # # 检测能否得到正确的depth
+    # print("task示例",peek_batch["task"][0])
 
 
-
-
-
+    # start train
     dl_iter = cycle(dataloader)
 
-    # policy.train()
+    policy.train()
 
-    # train_metrics = {
-    #     "loss": AverageMeter("loss", ":.3f"),
-    #     "grad_norm": AverageMeter("grdn", ":.3f"),
-    #     "lr": AverageMeter("lr", ":0.1e"),
-    #     "update_s": AverageMeter("updt_s", ":.3f"),
-    #     "dataloading_s": AverageMeter("data_s", ":.3f"),
-    # }
+    train_metrics = {
+        "loss": AverageMeter("loss", ":.3f"),
+        "grad_norm": AverageMeter("grdn", ":.3f"),
+        "lr": AverageMeter("lr", ":0.1e"),
+        "update_s": AverageMeter("updt_s", ":.3f"),
+        "dataloading_s": AverageMeter("data_s", ":.3f"),
+    }
 
-    # train_tracker = MetricsTracker(
-    #     cfg.batch_size, dataset.num_frames, dataset.num_episodes, train_metrics, initial_step=step
-    # )
+    train_tracker = MetricsTracker(
+        cfg.batch_size, dataset.num_frames, dataset.num_episodes, train_metrics, initial_step=step
+    )
 
     logging.info("Start offline training on a fixed dataset")
     for _ in range(step, cfg.steps):
         start_time = time.perf_counter()
         batch = next(dl_iter)
-        continue
         train_tracker.dataloading_s = time.perf_counter() - start_time
 
         for key in batch:
             if isinstance(batch[key], torch.Tensor):
                 batch[key] = batch[key].to(device, non_blocking=device.type == "cuda")
+        # print("task示例",batch["task"])
 
         train_tracker, output_dict = update_policy(
             train_tracker,
