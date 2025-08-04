@@ -146,6 +146,7 @@ def get_3d_point(x, y, depth_raw, intrinsics, depth_scale):
     point_3d = rs.rs2_deproject_pixel_to_point(intrinsics, [x, y], depth_val)
     return point_3d
 
+# count_of_number=0
 def count_distance(color_tensor, depth_tensor):
     # 转换图像
     color_img = _transform_image(color_tensor)
@@ -193,7 +194,7 @@ def count_distance(color_tensor, depth_tensor):
     # 获取中心点
     def get_center(mask):
         contour = find_largest_contour(mask)
-        if contour is not None and cv2.contourArea(contour) > 100:
+        if contour is not None:
             x, y, w, h = cv2.boundingRect(contour)
             return x + w // 2, y + h // 2
         return None
@@ -210,7 +211,6 @@ def count_distance(color_tensor, depth_tensor):
     yellow_point_cam = get_3d_point(*yellow_center, depth_raw, intrinsics, depth_scale)
 
     if red_point_cam is None or yellow_point_cam is None:
-        print("深度值为 0")
         return None
 
     # 转换到自定义坐标系
@@ -225,18 +225,15 @@ def count_distance(color_tensor, depth_tensor):
     vis_img = color_img.copy()
     cv2.rectangle(vis_img, (red_center[0]-10, red_center[1]-10), (red_center[0]+10, red_center[1]+10), (0, 0, 255), 2)
     cv2.rectangle(vis_img, (yellow_center[0]-10, yellow_center[1]-10), (yellow_center[0]+10, yellow_center[1]+10), (0, 255, 255), 2)
-    cv2.imwrite("get_red_and_yellow.png", vis_img)
-
-    # 输出深度图 RGB 平均值（调试用）
-    mean_R = depth_img_raw[:, :, 0].mean()
-    mean_G = depth_img_raw[:, :, 1].mean()
-    mean_B = depth_img_raw[:, :, 2].mean()
-    print(f"Depth Image Channel Means - R: {mean_R:.2f}, G: {mean_G:.2f}, B: {mean_B:.2f}")
+    # global count_of_number
+    
 
     # 返回两点间的欧氏距离
     red_np = np.array(red_custom)
     yellow_np = np.array(yellow_custom)
     distance = np.linalg.norm(red_np - yellow_np)
+    # cv2.imwrite(f"saveimages/get_red_and_yellow_{count_of_number}.png", vis_img)
+    # count_of_number+=1
     print(f"Distance between red and yellow targets: {distance:.3f} m")
     return distance
 
@@ -517,8 +514,8 @@ class SmolVLAPolicy(PreTrainedPolicy):
         self.model = VLAFlowMatching(config)
         self.reset()
         # 为了能more step
-        self._warmup_steps = 5  # 或从 config 中读取，可改
-        self._in_warmup = True
+        # self._warmup_steps = 5  # 或从 config 中读取，可改
+        self._in_warmup = False
         # if self._in_warmup:
         #     from simplify_work.obj_dection.detector_api import GroundingDINOProcessor
         #     self.obj_detector = GroundingDINOProcessor(
@@ -559,14 +556,19 @@ class SmolVLAPolicy(PreTrainedPolicy):
         return self.parameters()
 
     def _get_action_chunk(self, batch: dict[str, Tensor], noise: Tensor | None = None) -> Tensor:
+        import copy
+
+        batch_dict = copy.deepcopy(batch)
+        batch_dict.pop("observation.images.side_depth",None)  # 安全删除，不影响 batch
+
         # TODO: Check if this for loop is needed.
         # Context: In fact, self.queues contains only ACTION field, and in inference, we don't have action in the batch
         # In the case of offline inference, we have the action in the batch
         # that why without the k != ACTION check, it will raise an error because we are trying to stack
         # on an empty container.
-        for k in batch:
+        for k in batch_dict:
             if k in self._queues and k != ACTION:
-                batch[k] = torch.stack(list(self._queues[k]), dim=1)
+                batch_dict[k] = torch.stack(list(self._queues[k]), dim=1)
 
         """
         下面这四行在服务器运行。输入batch，返回actions
@@ -578,13 +580,16 @@ class SmolVLAPolicy(PreTrainedPolicy):
         """
         # 开启服务器推理。本地使用这个，并且注释掉后面四行。
         if IS_LOCAL:
-            actions=predict_from_server(batch)
+            actions=predict_from_server(batch_dict)
         else:
         # 服务器就注释掉上面一行，使用下面四行。
 
-            images, img_masks = self.prepare_images(batch)
-            state = self.prepare_state(batch)
-            lang_tokens, lang_masks = self.prepare_language(batch)
+        
+            # 0731临时修改
+
+            images, img_masks = self.prepare_images(batch_dict)
+            state = self.prepare_state(batch_dict)
+            lang_tokens, lang_masks = self.prepare_language(batch_dict)
             actions = self.model.sample_actions(images, img_masks, lang_tokens, lang_masks, state, noise=noise)
 
         # Unpad actions
@@ -650,12 +655,15 @@ class SmolVLAPolicy(PreTrainedPolicy):
             distance = count_distance(batch["observation.images.side"],batch["observation.images.side_depth"])
 
             # 根据距离设置 warmup 步数
-            if distance >= 0.15:
-                warmup_n = 5  # 区间 A: 远距离，执行 5 步
-            elif distance >= 0.1:
-                warmup_n = 3  # 区间 B: 中距离，执行 3 步
+            if distance is None:
+                warmup_n=1
             else:
-                warmup_n = 1  # 区间 C: 近距离，执行 1 步
+                if distance >= 0.2:
+                    warmup_n = 5  # 区间 A: 远距离，执行 5 步
+                elif distance >= 0.1:
+                    warmup_n = 3  # 区间 B: 中距离，执行 3 步
+                else:
+                    warmup_n = 1  # 区间 C: 近距离，执行 1 步
 
             # 如果 queue 中不足 N 个，就提前补充
             while len(self._queues[ACTION]) < warmup_n:
@@ -672,7 +680,7 @@ class SmolVLAPolicy(PreTrainedPolicy):
             weights = weights.view(1, -1, 1)  # [1, N, 1]
 
             weighted_action = (actions * weights).sum(dim=1)  # [B, D]
-            print(f"[Warmup] 距离: {distance:.3f}, 动作步数: {warmup_n},  剩余queue: {len(self._queues[ACTION])}")
+            print(f"[Warmup] 距离: {distance}, 动作步数: {warmup_n},  剩余queue: {len(self._queues[ACTION])}")
             return weighted_action
         print(f"走一步,剩余queue: {len(self._queues[ACTION])}")
         return self._queues[ACTION].popleft()

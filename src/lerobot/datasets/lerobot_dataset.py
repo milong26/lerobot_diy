@@ -358,7 +358,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         use_true_depth: bool= False,
         use_language_tip: bool= False,
         # record:控制录制的时候是否保存images文件夹
-        save_image_folder=False
+        save_image_folder: bool = True
     ):
         """
         2 modes are available for instantiating this class, depending on 2 different use cases:
@@ -478,8 +478,9 @@ class LeRobotDataset(torch.utils.data.Dataset):
         # 根据train新增，默认是false
         self.use_true_depth=use_true_depth
         self.use_language_tip=use_language_tip
-        # 根据collect新增，默认是false
+        # 根据collect新增，默认是True
         self.save_image_folder=save_image_folder
+        print("设定self.save_image_folder",self.save_image_folder)
 
         # Unused attributes
         self.image_writer = None
@@ -530,7 +531,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
 
 
 
-        self.modified_tasks = load_modified_tasks("training_dataset/0727pickplace/first100/meta/modified_tasks_filled.jsonl")
+        # self.modified_tasks = load_modified_tasks("training_dataset/0727pickplace/first100/meta/modified_tasks_filled.jsonl")
 
 
 
@@ -1086,8 +1087,8 @@ class LeRobotDataset(torch.utils.data.Dataset):
             ).parent
             encode_video_frames(img_dir, video_path, self.fps, overwrite=True)
             # 为了使用深度图,不删除
-            if self.save_image_folder == False:
-                shutil.rmtree(img_dir)
+            # if self.save_image_folder == False:
+            #     shutil.rmtree(img_dir)
 
         # Update video info (only needed when first episode is encoded since it reads from episode 0)
         if len(self.meta.video_keys) > 0 and episode_index == 0:
