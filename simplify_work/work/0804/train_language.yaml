@@ -20,7 +20,7 @@ policy:
   repo_id: lerobot/smolvla_base
   type: smolvla
 
-use_depth_image: false
+use_depth_image: true
 use_force: false
-use_language_tip: false
-use_true_depth: false
+use_language_tip: true
+use_true_depth: true

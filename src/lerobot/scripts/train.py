@@ -252,9 +252,9 @@ def train(cfg: TrainPipelineConfig):
         exclude_features += ["observation.force", "observation.force_is_pad"]
     obj_detector = None
     # 显存足够的情况下可以这么搞(虽然有一点误差),现在改成本地文件了
-    # if cfg.use_language_tip:
-    #     from simplify_work.obj_dection.detector_api import YOLOProcessor
-    #     obj_detector = YOLOProcessor()
+    if cfg.use_language_tip:
+        from simplify_work.obj_dection.detector_api import YOLOProcessor
+        obj_detector = YOLOProcessor()
 
     """
     保存图片到本地
@@ -269,6 +269,7 @@ def train(cfg: TrainPipelineConfig):
     # 测试
     # peek_batch = next(iter(dataloader))
     # print("真正训练的时候甬道的feature：", list(peek_batch.keys()))
+    # raise KeyError("输出检查")
     # # 检测能否得到正确的depth
     # print("task示例",peek_batch["task"][0])
 
