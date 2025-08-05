@@ -30,7 +30,7 @@ class VisionProcessor:
         # 黄色识别 (物体)
         self.lower_yellow = np.array([15, 30, 80])
         self.upper_yellow = np.array([45, 255, 255])
-        self.min_contour_area = 100
+        self.min_contour_area = 50
 
         self.total_images = 0
         self.gripper_detected = 0
@@ -147,27 +147,52 @@ class VisionProcessor:
         return avg_points
 
     def add_depth_info_to_task(self, rgb_batch, depth_batch, task_batch):
-        rgb_batch = rgb_batch.to("cuda" if torch.cuda.is_available() else "cpu")
-        depth_batch = depth_batch.to("cuda" if torch.cuda.is_available() else "cpu")
+        # device = "cuda" if torch.cuda.is_available() else "cpu"
+        # rgb_batch = rgb_batch.to(device)
+        # depth_batch = depth_batch.to(device)
         updated_tasks = []
 
         for rgb, depth, task in zip(rgb_batch, depth_batch, task_batch):
-            if "|" in task or "gripper at" in task or "Pyramid-Shaped Sachet at" in task:
+            if "|" in task:
                 print("处理过了,pass")
                 updated_tasks.append(task)
                 continue
 
             points_3d = self.process_sample(rgb, depth)
-            if points_3d and len(points_3d) >= 2:
+            task_str = task  # 默认原始 task
+
+            if points_3d:
                 converted_3d = self.transform_camera_to_custom_coordsystem(points_3d)
-                a, b = converted_3d[0], converted_3d[1]
-                a_str = f"({a[0]:.3f}, {a[1]:.3f}, {a[2]:.3f})" if a else "(N/A, N/A, N/A)"
-                b_str = f"({b[0]:.3f}, {b[1]:.3f}, {b[2]:.3f})" if b else "(N/A, N/A, N/A)"
-                task_str = f"{task} | gripper at {a_str}m, the Pyramid-Shaped Sachet at {b_str}m"
+
+                gripper_pos = converted_3d[0] if len(converted_3d) > 0 else None
+                object_pos = converted_3d[1] if len(converted_3d) > 1 else None
+
+                gripper_str = (
+                    f"({gripper_pos[0]:.3f}, {gripper_pos[1]:.3f}, {gripper_pos[2]:.3f})"
+                    if gripper_pos is not None else None
+                )
+                object_str = (
+                    f"({object_pos[0]:.3f}, {object_pos[1]:.3f}, {object_pos[2]:.3f})"
+                    if object_pos is not None else None
+                )
+
+                if gripper_str and object_str:
+                    task_str = f"{task} | gripper at {gripper_str},sachet at {object_str}"
+                elif gripper_str:
+                    task_str = f"{task} | gripper at {gripper_str}"
+                elif object_str:
+                    task_str = f"{task} | sachet at {object_str}"
+                else:
+                    task_str = f"{task} |"
             else:
                 task_str = f"{task} |"
+
+
             updated_tasks.append(task_str)
+
         return updated_tasks
+
+
 
     def decode_depth_from_rgb(self, rgb_image: np.ndarray) -> np.ndarray:
         r = rgb_image[:, :, 0].astype(np.uint8)

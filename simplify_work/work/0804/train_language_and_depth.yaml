@@ -10,8 +10,8 @@ dataset:
 
 batch_size: 64
 steps: 20000
-output_dir: outputs/train/0804/baseline_100
-job_name: training_pickplace_with_first100_baseline
+output_dir: outputs/train/0804/language_and_depth_100
+job_name: training_pickplace_with_first100_languageanddepth
 wandb:
   enable: false
 
