@@ -825,20 +825,21 @@ class LeRobotDataset(torch.utils.data.Dataset):
 
         # Add task as a string
         # 原来准备用yolo的，0804重新采集数据之后可以用opencv直接定位了
-        # if self.use_language_tip:
-        #     # 从本地读取
-        #     if not len(frame_idx) == 1:
-        #         raise KeyError("一次getitem应该只获取一个")
-        #     frame_idx=frame_idx[0]
-        #     if hasattr(self, "modified_tasks") and ep_idx in self.modified_tasks and frame_idx in self.modified_tasks[ep_idx]:
-        #         item["task"] = self.modified_tasks[ep_idx][frame_idx]
-        #     else:
-        #         task_idx = item["task_index"].item()
-        #         item["task"] = self.meta.tasks[task_idx]
-        # else:
+        # 但是准确率不准，有缺失，训练数据还是用干净的比较好
+        if self.use_language_tip:
+            # 从本地读取
+            if not len(frame_idx) == 1:
+                raise KeyError("一次getitem应该只获取一个")
+            frame_idx=frame_idx[0]
+            if hasattr(self, "modified_tasks") and ep_idx in self.modified_tasks and frame_idx in self.modified_tasks[ep_idx]:
+                item["task"] = self.modified_tasks[ep_idx][frame_idx]
+            else:
+                task_idx = item["task_index"].item()
+                item["task"] = self.meta.tasks[task_idx]
+        else:
         # 平常的task
-        task_idx = item["task_index"].item()
-        item["task"] = self.meta.tasks[task_idx]
+            task_idx = item["task_index"].item()
+            item["task"] = self.meta.tasks[task_idx]
 
 
 

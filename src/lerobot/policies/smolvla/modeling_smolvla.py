@@ -630,10 +630,21 @@ class SmolVLAPolicy(PreTrainedPolicy):
 
         tasks = [task if task.endswith("\n") else f"{task}\n" for task in tasks]
 
+
+
+        # 以前是不加的，直到用了language，添加了一些语言
+        """
+        ValueError: Unable to create tensor, you should probably 
+        activate truncation and/or padding with 'padding=True' 'truncation=True' 
+        to have batched tensors with the same length. 
+        Perhaps your features (`input_ids` in this case) have excessive nesting (inputs type `list` where type `int` is expected).
+        """
         tokenized_prompt = self.language_tokenizer.__call__(
             tasks,
             padding=self.config.pad_language_to,
             padding_side="right",
+            # padding=True,
+            # truncation=True,       
             max_length=self.config.tokenizer_max_length,
             return_tensors="pt",
         )

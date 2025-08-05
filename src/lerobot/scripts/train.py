@@ -69,45 +69,52 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import json
 from pathlib import Path
 
+import json
+from pathlib import Path
+
 class FilteredBatchLoader:
-    def __init__(self, dataloader, exclude_keys: list, obj_detector=None, save_task_path='training_dataset/0727pickplace/first100/meta/modified_tasks.jsonl'):
+    def __init__(self, dataloader, exclude_keys: list, obj_detector=None, save_task_path='training_dataset/0803_with_red/pickplace/first100/pickplace/meta/modified_tasks.jsonl'):
         self.dataloader = dataloader
         self.exclude_keys = set(exclude_keys)
         self.obj_detector = obj_detector
         self.save_task_path = Path(save_task_path) if save_task_path else None
+
+        # # 暂时不用了
         # if self.save_task_path:
         #     self.save_task_path.parent.mkdir(parents=True, exist_ok=True)
-        #     self.task_f = open(self.save_task_path, "a")  # 以 append 模式写入
-    
+        #     self.task_f = open(self.save_task_path, "a")
+
     def __del__(self):
         if hasattr(self, "task_f") and not self.task_f.closed:
             self.task_f.close()
 
     def __iter__(self):
         for batch in self.dataloader:
+            # Step 1: apply obj_detector before excluding keys
+            # if self.obj_detector is not None:
+            #     images = batch.get("observation.images.side").cpu()
+            #     depths = batch.get("observation.images.side_depth").cpu()
+            #     tasks = batch.get("task")
+
+            #     if images is not None and depths is not None and tasks is not None:
+            #         new_tasks = self.obj_detector.add_depth_info_to_task(images, depths, tasks)
+            #         batch["task"] = new_tasks
+
+            #         if self.save_task_path:
+            #             ep_indices = batch.get("episode_index", [])
+            #             frame_indices = batch.get("frame_index", [])
+            #             for ep, frame, task in zip(ep_indices, frame_indices, new_tasks):
+            #                 record = {
+            #                     "episode_index": int(ep.item()),
+            #                     "frame_index": int(frame.item()),
+            #                     "task": task,
+            #                 }
+            #                 self.task_f.write(json.dumps(record) + "\n")
+
+            #         self.obj_detector.print_statistics()
+
+            # Step 2: now filter excluded keys
             filtered_batch = {k: v for k, v in batch.items() if k not in self.exclude_keys}
-
-            if self.obj_detector is not None:
-                images = filtered_batch["observation.images.side"]
-                depths = filtered_batch["observation.images.side_depth"]
-                tasks = filtered_batch["task"]
-
-                new_tasks = self.obj_detector.add_depth_info_to_task(images, depths, tasks)
-                filtered_batch["task"] = new_tasks
-
-                #  保存每帧的修改后task
-                if self.save_task_path:
-                    ep_indices = filtered_batch["episode_index"]
-                    frame_indices = filtered_batch["frame_index"]
-                    for ep, frame, task in zip(ep_indices, frame_indices, new_tasks):
-                        record = {
-                            "episode_index": int(ep.item()),
-                            "frame_index": int(frame.item()),
-                            "task": task,
-                        }
-                        self.task_f.write(json.dumps(record) + "\n")
-
-                self.obj_detector.print_statistics()
 
             yield filtered_batch
 
@@ -197,6 +204,7 @@ def train(cfg: TrainPipelineConfig):
         logging.info("Creating env")
         eval_env = make_env(cfg.env, n_envs=cfg.eval.batch_size, use_async_envs=cfg.eval.use_async_envs)
 
+    # 开始
     logging.info("Creating policy")
     policy = make_policy(
         cfg=cfg.policy,
@@ -206,9 +214,11 @@ def train(cfg: TrainPipelineConfig):
     logging.info("Creating optimizer and scheduler")
     optimizer, lr_scheduler = make_optimizer_and_scheduler(cfg, policy)
     grad_scaler = GradScaler(device.type, enabled=cfg.policy.use_amp)
+    # 结束
 
     step = 0  # number of policy updates (forward + backward + optim)
 
+    # 开始
     if cfg.resume:
         step, optimizer, lr_scheduler = load_training_state(cfg.checkpoint_path, optimizer, lr_scheduler)
 
@@ -223,6 +233,7 @@ def train(cfg: TrainPipelineConfig):
     logging.info(f"{dataset.num_episodes=}")
     logging.info(f"{num_learnable_params=} ({format_big_number(num_learnable_params)})")
     logging.info(f"{num_total_params=} ({format_big_number(num_total_params)})")
+    # 结束
 
     if hasattr(cfg.policy, "drop_n_last_frames"):
         shuffle = False
@@ -251,10 +262,10 @@ def train(cfg: TrainPipelineConfig):
     if not cfg.use_force:
         exclude_features += ["observation.force", "observation.force_is_pad"]
     obj_detector = None
-    # 显存足够的情况下可以这么搞(虽然有一点误差),现在改成本地文件了
+
     if cfg.use_language_tip:
-        from simplify_work.obj_dection.detector_api import YOLOProcessor
-        obj_detector = YOLOProcessor()
+        from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
+        obj_detector = VisionProcessor()
 
     """
     保存图片到本地
@@ -266,12 +277,11 @@ def train(cfg: TrainPipelineConfig):
     # 包装 dataloader
     dataloader = FilteredBatchLoader(raw_dataloader, exclude_features, obj_detector=obj_detector)
 
-    # 测试
+    # 检查
     # peek_batch = next(iter(dataloader))
     # print("真正训练的时候甬道的feature：", list(peek_batch.keys()))
-    # raise KeyError("输出检查")
-    # # 检测能否得到正确的depth
     # print("task示例",peek_batch["task"][0])
+    # raise KeyError("输出检查")
 
 
     # start train
