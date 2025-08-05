@@ -297,11 +297,7 @@ class RobotClient:
                 # Deserialize bytes back into list[TimedAction]
                 deserialize_start = time.perf_counter()
 
-                # timed_actions = pickle.loads(actions_chunk.data)  # nosec
-                # 改成action,distance
-                timed_actions, distance = pickle.loads(actions_chunk.data)  # 假设现在是个 tuple
-                self.latest_distance = distance
-
+                timed_actions = pickle.loads(actions_chunk.data)  # nosec
                 
                 deserialize_time = time.perf_counter() - deserialize_start
 
@@ -380,16 +376,16 @@ class RobotClient:
         """Reading and performing actions in local queue"""
 
         # 根据distance决定一次趣N个动作
-        distance = self.latest_distance or 0  # default to 0 if not set
+        # distance =   # default to 0 if not set
 
-        # 决定取几个动作
-        if distance > self.config.high_distance_threshold:
-            num_actions = self.config.high_distance_action_aggregate  # e.g. 5
-        elif distance > self.config.low_distance_threshold:
-            num_actions = self.config.low_distance_action_aggregate  # e.g. 3
-        else:
-            num_actions = 1
-
+        # # 决定取几个动作
+        # if distance > self.config.high_distance_threshold:
+        #     num_actions = self.config.high_distance_action_aggregate  # e.g. 5
+        # elif distance > self.config.low_distance_threshold:
+        #     num_actions = self.config.low_distance_action_aggregate  # e.g. 3
+        # else:
+        #     num_actions = 1
+        num_actions=1
         # Lock only for queue operations
         get_start = time.perf_counter()
 
