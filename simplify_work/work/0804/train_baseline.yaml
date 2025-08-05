@@ -10,7 +10,7 @@ dataset:
 
 batch_size: 64
 steps: 20000
-output_dir: outputs/train/0804/baseline_100
+output_dir: outputs/train/0804/baseline_100_test_kill
 job_name: training_pickplace_with_first100_baseline
 wandb:
   enable: false
