@@ -84,12 +84,12 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         
         # 如果推理的时候需要用distance
         # TODO 后面要测试language的话也要加载，暂时没想好api怎么写
-        self.count_distance = False
-        if self.count_distance:
-            from simplify_work.obj_dection.detector_api import YOLOProcessor
-            self.obj_detector = YOLOProcessor()
-        else:
-            self.obj_detector = None
+        # self.count_distance = False
+        # if self.count_distance:
+        #     from simplify_work.obj_dection.detector_api import YOLOProcessor
+        #     self.obj_detector = YOLOProcessor()
+        # else:
+        #     self.obj_detector = None
 
 
     @property
@@ -223,35 +223,35 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
 
             # 计算distance
-            try:
-                print("obs.get_observation的内容",obs.get_observation())
-                depth_tensor = obs.get_observation()["observation.images.side_depth"]
-                rgb_tensor=obs.get_observation()["observation.images.side"]
-                print("depth_tensor实际的树脂",depth_tensor)
-                if self.use_distance and self.obj_detector is not None:
-                    distances = self.obj_detector.count_distance(depth_tensor, depth_tensor)
-                else:
-                    distances= None
-                # distance=None:
-                if distance is None:
-                    # 按照距离最近改成0
-                    distance=0
+            # try:
+                # print("obs.get_observation的内容",obs.get_observation())
+                # depth_tensor = obs.get_observation()["observation.images.side_depth"]
+                # rgb_tensor=obs.get_observation()["observation.images.side"]
+                # print("depth_tensor实际的树脂",depth_tensor)
+                # if self.use_distance and self.obj_detector is not None:
+                #     distances = self.obj_detector.count_distance(depth_tensor, depth_tensor)
+                # else:
+                #     distances= None
+                # # distance=None:
+                # if distance is None:
+                #     # 按照距离最近改成0
+                #     distance=0
 
-                raise KeyError("确认depth_tensor的内容")
-                depth_np = depth_tensor.cpu().numpy()
-                distance = compute_distance_from_depth(depth_np)
-            except Exception as e:
-                self.logger.warning(f"Failed to compute distance: {e}")
-                distance = -1.0  # fallback 值
+                # raise KeyError("确认depth_tensor的内容")
+            #     depth_np = depth_tensor.cpu().numpy()
+            #     distance = compute_distance_from_depth(depth_np)
+            # except Exception as e:
+            #     self.logger.warning(f"Failed to compute distance: {e}")
+            #     distance = -1.0  # fallback 值
 
             start_time = time.perf_counter()
             action_chunk = self._predict_action_chunk(obs)
             inference_time = time.perf_counter() - start_time
 
             start_time = time.perf_counter()
-            # actions_bytes = pickle.dumps(action_chunk)  # nosec
+            actions_bytes = pickle.dumps(action_chunk)  # nosec
             # 打包actionchunk+distance
-            actions_bytes = pickle.dumps((action_chunk, distance))  # nosec
+            # actions_bytes = pickle.dumps((action_chunk, distance))  # nosec
             serialize_time = time.perf_counter() - start_time
 
             # Create and return the action chunk
