@@ -57,6 +57,7 @@ from lerobot.transport import (
 from lerobot.transport.utils import receive_bytes_in_chunks
 
 
+
 class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
     prefix = "policy_server"
     logger = get_logger(prefix)
@@ -82,15 +83,10 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         self.actions_per_chunk = None
         self.policy = None
         
-        # 如果推理的时候需要用distance
-        # TODO 后面要测试language的话也要加载，暂时没想好api怎么写
-        # self.count_distance = False
-        # if self.count_distance:
-        #     from simplify_work.obj_dection.detector_api import YOLOProcessor
-        #     self.obj_detector = YOLOProcessor()
-        # else:
-        #     self.obj_detector = None
-
+        # 新增 处理task
+        self.modify_task=False # 这个应该可以不需要，直接判断objdetector是不是None就可以
+        self.obj_detector=None
+        
 
     @property
     def running(self):
@@ -149,6 +145,8 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         self.policy_type = policy_specs.policy_type  # act, pi0, etc.
         self.lerobot_features = policy_specs.lerobot_features
         self.actions_per_chunk = policy_specs.actions_per_chunk
+        # 增加modifiedtask开关
+        self.modify_task=policy_specs.modify_task
 
         policy_class = get_policy_class(self.policy_type)
 
@@ -156,6 +154,9 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         self.policy = policy_class.from_pretrained(policy_specs.pretrained_name_or_path)
         self.policy.to(self.device)
         end = time.perf_counter()
+        if self.modify_task:
+            from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
+            self.obj_detector = VisionProcessor()
 
         self.logger.info(f"Time taken to put policy on {self.device}: {end - start:.4f} seconds")
 
@@ -221,28 +222,16 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             with self._predicted_timesteps_lock:
                 self._predicted_timesteps.add(obs.get_timestep())
 
-
-            # 计算distance
-            # try:
-                # print("obs.get_observation的内容",obs.get_observation())
-                # depth_tensor = obs.get_observation()["observation.images.side_depth"]
-                # rgb_tensor=obs.get_observation()["observation.images.side"]
-                # print("depth_tensor实际的树脂",depth_tensor)
-                # if self.use_distance and self.obj_detector is not None:
-                #     distances = self.obj_detector.count_distance(depth_tensor, depth_tensor)
-                # else:
-                #     distances= None
-                # # distance=None:
-                # if distance is None:
-                #     # 按照距离最近改成0
-                #     distance=0
-
-                # raise KeyError("确认depth_tensor的内容")
-            #     depth_np = depth_tensor.cpu().numpy()
-            #     distance = compute_distance_from_depth(depth_np)
-            # except Exception as e:
-            #     self.logger.warning(f"Failed to compute distance: {e}")
-            #     distance = -1.0  # fallback 值
+            # 处理obs中的task
+            if self.obj_detector:
+                task=obs["task"]
+                colored_image=obs["observation.images.side"]
+                depth_image=obs["observation.images.side_dpeth"]
+                # print("之前的task",task)
+                task= self.obj_detector.add_depth_info_to_task(colored_image,depth_image,task)
+                # print("后来的task",task)
+            # raise KeyError("+task")
+            
 
             start_time = time.perf_counter()
             action_chunk = self._predict_action_chunk(obs)
@@ -414,7 +403,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
 
 @draccus.wrap()
-def serve(cfg: PolicyServerConfig):
+def serve(cfg: PolicyServerConfig)
     """Start the PolicyServer with the given configuration.
 
     Args:

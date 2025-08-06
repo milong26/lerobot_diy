@@ -273,6 +273,9 @@ class RemotePolicyConfig:
     lerobot_features: dict[str, PolicyFeature]
     actions_per_chunk: int
     device: str = "cpu"
+    # 为了控制服务器是否修改task，默认为False
+    modify_task: bool = False
+    # 控制服务器是否使用depth
 
 
 def _compare_observation_states(obs1_state: torch.Tensor, obs2_state: torch.Tensor, atol: float) -> bool:
