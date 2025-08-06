@@ -152,6 +152,12 @@ class RobotClientConfig:
     high_distance_action_aggregate: int = 5
     low_distance_action_aggregate: int = 3
 
+    """
+    个性化
+    """
+    # 使用语言指导
+    use_language_tip: bool=False
+
 
     @property
     def environment_dt(self) -> float:
