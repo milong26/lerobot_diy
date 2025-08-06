@@ -157,6 +157,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         if self.modify_task:
             from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
             self.obj_detector = VisionProcessor()
+            print("========使用language========")
 
         self.logger.info(f"Time taken to put policy on {self.device}: {end - start:.4f} seconds")
 
@@ -221,16 +222,8 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
             with self._predicted_timesteps_lock:
                 self._predicted_timesteps.add(obs.get_timestep())
+            
 
-            # 处理obs中的task
-            if self.obj_detector:
-                task=obs["task"]
-                colored_image=obs["observation.images.side"]
-                depth_image=obs["observation.images.side_dpeth"]
-                # print("之前的task",task)
-                task= self.obj_detector.add_depth_info_to_task(colored_image,depth_image,task)
-                # print("后来的task",task)
-            # raise KeyError("+task")
             
 
             start_time = time.perf_counter()
@@ -364,6 +357,15 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
         self.last_processed_obs: TimedObservation = observation_t
 
+
+        # 处理obs中的task
+        if self.obj_detector is not None:
+            task=observation["task"]
+            colored_image=observation["observation.images.side"]
+            depth_image=observation["observation.images.side_depth"]
+            task_batch = [task]
+            task=self.obj_detector.add_depth_info_to_task(colored_image,depth_image,task_batch)[0]
+
         """2. Get action chunk"""
         start_time = time.perf_counter()
         action_tensor = self._get_action_chunk(observation)
@@ -403,7 +405,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
 
 @draccus.wrap()
-def serve(cfg: PolicyServerConfig)
+def serve(cfg: PolicyServerConfig):
     """Start the PolicyServer with the given configuration.
 
     Args:
