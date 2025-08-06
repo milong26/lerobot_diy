@@ -37,7 +37,25 @@ class VisionProcessor:
         self.object_detected = 0
 
     def _transform_image(self, image_tensor):
-        image_np = (image_tensor.permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
+        if isinstance(image_tensor, torch.Tensor):
+            image_np = (image_tensor.permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
+        elif isinstance(image_tensor, np.ndarray):
+            if image_tensor.ndim == 3:
+                # 如果是 [H, W, C]，直接用
+                if image_tensor.shape[2] == 3:
+                    image_np = image_tensor.astype(np.uint8)
+                # 如果是 [C, H, W]，先转换
+                elif image_tensor.shape[0] == 3:
+                    image_np = np.transpose(image_tensor, (1, 2, 0)).astype(np.uint8)
+                else:
+                    raise ValueError(f"Unsupported numpy image shape: {image_tensor.shape}")
+            elif image_tensor.ndim == 4:
+                # [1, C, H, W] 或 [1, H, W, C]
+                image_tensor = image_tensor[0]
+                return self._transform_image(image_tensor)
+            else:
+                raise ValueError(f"Unsupported numpy image dimensions: {image_tensor.ndim}")
+
         return image_np
 
     def _get_bbox_center(self, bbox):
@@ -93,7 +111,7 @@ class VisionProcessor:
         return None, None
 
     @torch.no_grad()
-    def process_sample(self, side_img: torch.Tensor, side_depth: torch.Tensor):
+    def process_sample(self, side_img, side_depth):
         image_tensor = self._transform_image(side_img)
         depth_tensor = self._transform_image(side_depth)
         bgr_image = cv2.cvtColor(image_tensor, cv2.COLOR_RGB2BGR)
@@ -175,7 +193,6 @@ class VisionProcessor:
                     f"({object_pos[0]:.3f}, {object_pos[1]:.3f}, {object_pos[2]:.3f})"
                     if object_pos is not None else None
                 )
-
                 if gripper_str and object_str:
                     task_str = f"{task} | gripper at {gripper_str},sachet at {object_str}"
                 elif gripper_str:
