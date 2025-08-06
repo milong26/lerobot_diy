@@ -403,7 +403,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
 
 @draccus.wrap()
-def serve(cfg: PolicyServerConfig)
+def serve(cfg: PolicyServerConfig):
     """Start the PolicyServer with the given configuration.
 
     Args:
