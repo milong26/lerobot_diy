@@ -52,8 +52,8 @@ def count_distance(color_tensor, depth_tensor):
     color_img = _transform_image(color_tensor)
     color_img = cv2.cvtColor(color_img, cv2.COLOR_RGB2BGR)
     depth_img_raw = _transform_image(depth_tensor)
-    cv2.imwrite("debug_side_color.png", color_img)
-    cv2.imwrite("debug_side_depth_rgb.png", depth_img_raw)
+    # cv2.imwrite("debug_side_color.png", color_img)
+    # cv2.imwrite("debug_side_depth_rgb.png", depth_img_raw)
 
 
 
