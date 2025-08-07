@@ -3,7 +3,7 @@
 # python src/lerobot/scripts/server/robot_client.py --config_path=
 
 
-server_address: 10.10.16.16:9000
+server_address: 10.10.16.18:9000
 
 robot:
   type: so100_follower
@@ -16,7 +16,7 @@ robot:
       width: 640
       height: 480
       fps: 30
-      use_depth: false
+      use_depth: true
     wrist:
       type: opencv
       index_or_path: 6
@@ -28,10 +28,11 @@ task: "pick up the pyramid-shaped sachet and place it into the box."
 
 policy_type: smolvla
 # POLICY: the model name/path on server to the checkpoint to run (e.g., lerobot/smolvla_base)
-pretrained_name_or_path: outputs/train/0804/baseline_100/checkpoints/020000/pretrained_model
+pretrained_name_or_path: outputs/train/0804/baseline_100/checkpoints/026000/pretrained_model
 policy_device: cuda
 actions_per_chunk: 50
 
-chunk_size_threshold: 0.5
+chunk_size_threshold: 0.6
 aggregate_fn_name: weighted_average
+# aggregate_fn_name: latest_only
 debug_visualize_queue_size: true

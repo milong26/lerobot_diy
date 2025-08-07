@@ -532,6 +532,10 @@ class LeRobotDataset(torch.utils.data.Dataset):
 
 
         # self.modified_tasks = load_modified_tasks("training_dataset/0727pickplace/first100/meta/modified_tasks_filled.jsonl")
+        self.modified_tasks=None
+        if self.use_language_tip:
+            # woca?????????????????????我之前的task没有改吗？？？？？？？？？？？？？？
+            self.modified_tasks = load_modified_tasks("training_dataset/0803_with_red/pickplace/first100/meta/relative_task_grid.jsonl")
 
 
 
