@@ -357,6 +357,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         # train:为了控制是否使用真~深度图片而不是采用有损失的视频
         use_true_depth: bool= False,
         use_language_tip: bool= False,
+        language_tip_mode: str="",
         # record:控制录制的时候是否保存images文件夹
         save_image_folder: bool = True
     ):
@@ -478,6 +479,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         # 根据train新增，默认是false
         self.use_true_depth=use_true_depth
         self.use_language_tip=use_language_tip
+        self.language_tip_mode=language_tip_mode
         # 根据collect新增，默认是True
         self.save_image_folder=save_image_folder
         print("设定self.save_image_folder",self.save_image_folder)
@@ -534,8 +536,12 @@ class LeRobotDataset(torch.utils.data.Dataset):
         # self.modified_tasks = load_modified_tasks("training_dataset/0727pickplace/first100/meta/modified_tasks_filled.jsonl")
         self.modified_tasks=None
         if self.use_language_tip:
-            # woca?????????????????????我之前的task没有改吗？？？？？？？？？？？？？？
-            self.modified_tasks = load_modified_tasks("training_dataset/0803_with_red/pickplace/first100/meta/relative_task_grid.jsonl")
+            tip_filename = f"mtask_{cfg.language_tip_mode}.jsonl"
+            tip_file = self.root / "meta" / tip_filename
+            if not tip_file.exists():
+                raise FileNotFoundError(f"训练需要的文件不存在: {tip_file}")
+
+            self.modified_tasks = load_modified_tasks(tip_file)
 
 
 

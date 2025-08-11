@@ -24,3 +24,6 @@ use_depth_image: false
 use_force: false
 use_language_tip: true
 use_true_depth: true
+# 这个和jsonl的文件名一致
+# "{self.language_tip_mode}_task_grid.jsonl"
+language_tip_mode: relative

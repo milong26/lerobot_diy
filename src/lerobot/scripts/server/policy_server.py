@@ -113,6 +113,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
         return services_pb2.Empty()
 
+    # 接收本地传过来的policy setting
     def SendPolicyInstructions(self, request, context):  # noqa: N802
         """Receive policy instructions from the robot client"""
 
@@ -154,10 +155,35 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         self.policy = policy_class.from_pretrained(policy_specs.pretrained_name_or_path)
         self.policy.to(self.device)
         end = time.perf_counter()
+
+        # 根据模型的路径选择合适的modify_task策略（貌似也能，但是配置的可读性有点差，算了）
+        model_path = policy_specs.pretrained_name_or_path
+        model_dirname = Path(model_path).parts  # or use Path(model_path).name for last part
+
+        # 假设模型路径中有 "mtask_*"
+        if self.modify_task:
+        # 也可以改成直接判断lang_mode是否为None而决定要不要用modify_task
+            lang_mode = None
+            for part in model_dirname:
+                if part.startswith("mtask_"):
+                    lang_mode = part.split("mtask_")[1]
+                    break
+
+            if lang_mode is not None:
+                self.modify_task = True
+                self.language_tip_mode = lang_mode
+                # 构造 obj_detector 实例并传入 mode
+                from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
+                self.obj_detector = VisionProcessor(mode=lang_mode)
+        else:
+            self.modify_task = False
+            self.obj_detector = None
+
+
+
         if self.modify_task:
             from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
-            self.obj_detector = VisionProcessor()
-            print("========使用language========")
+            self.obj_detector = VisionProcessor(mtask_mode=mtask_mode)
 
         self.logger.info(f"Time taken to put policy on {self.device}: {end - start:.4f} seconds")
 

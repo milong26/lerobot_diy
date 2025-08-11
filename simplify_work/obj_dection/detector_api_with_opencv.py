@@ -18,7 +18,7 @@ depth_scale = 0.0010000000474974513
 
 
 class VisionProcessor:
-    def __init__(self):
+    def __init__(self,mtask_mode=""):
         self.fail_counter = 0
 
         # 红色识别 (夹子)
@@ -35,6 +35,9 @@ class VisionProcessor:
         self.total_images = 0
         self.gripper_detected = 0
         self.object_detected = 0
+
+        # task处理的mode
+        self.mtask_mode=mtask_mode
 
     def _transform_image(self, image_tensor):
         if isinstance(image_tensor, torch.Tensor):
