@@ -168,9 +168,6 @@ class VisionProcessor:
         return avg_points
 
     def add_depth_info_to_task(self, rgb_batch, depth_batch, task_batch):
-        # device = "cuda" if torch.cuda.is_available() else "cpu"
-        # rgb_batch = rgb_batch.to(device)
-        # depth_batch = depth_batch.to(device)
         updated_tasks = []
 
         for rgb, depth, task in zip(rgb_batch, depth_batch, task_batch):
@@ -182,35 +179,63 @@ class VisionProcessor:
             points_3d = self.process_sample(rgb, depth)
             task_str = task  # 默认原始 task
 
-            if points_3d:
+            if points_3d and len(points_3d) >= 2:
                 converted_3d = self.transform_camera_to_custom_coordsystem(points_3d)
+                gripper_pos = converted_3d[0]
+                object_pos = converted_3d[1]
 
-                gripper_pos = converted_3d[0] if len(converted_3d) > 0 else None
-                object_pos = converted_3d[1] if len(converted_3d) > 1 else None
+                if self.mtask_mode == "relative":
+                    # 只有当两个点都存在，才计算相对坐标
+                    if gripper_pos is not None and object_pos is not None:
+                        dx = object_pos[0] - gripper_pos[0]
+                        dy = object_pos[1] - gripper_pos[1]
+                        dz = object_pos[2] - gripper_pos[2]
+                        task_str = (f"{task}, sachet position relative to gripper is "
+                                    f"({dx:.3f}, {dy:.3f}, {dz:.3f})")
+                    else:
+                        # 缺失任何一个，返回原始任务
+                        task_str = task
 
-                gripper_str = (
-                    f"({gripper_pos[0]:.3f}, {gripper_pos[1]:.3f}, {gripper_pos[2]:.3f})"
-                    if gripper_pos is not None else None
-                )
-                object_str = (
-                    f"({object_pos[0]:.3f}, {object_pos[1]:.3f}, {object_pos[2]:.3f})"
-                    if object_pos is not None else None
-                )
-                if gripper_str and object_str:
-                    task_str = f"{task} | gripper at {gripper_str},sachet at {object_str}"
-                elif gripper_str:
-                    task_str = f"{task} | gripper at {gripper_str}"
-                elif object_str:
-                    task_str = f"{task} | sachet at {object_str}"
+                elif self.mtask_mode == "relative_grid":
+                    if gripper_pos is not None and object_pos is not None:
+                        dx = object_pos[0] - gripper_pos[0]
+                        dy = object_pos[1] - gripper_pos[1]
+                        dz = object_pos[2] - gripper_pos[2]
+                        # 5cm = 0.05m
+                        dx_grid = round(dx / 0.05)
+                        dy_grid = round(dy / 0.05)
+                        dz_grid = round(dz / 0.05)
+                        task_str = (f"{task}, sachet position relative to gripper is "
+                                    f"({dx_grid}, {dy_grid}, {dz_grid}) in 5cm grid units.")
+                    else:
+                        task_str = task
+
                 else:
-                    task_str = f"{task} |"
-            else:
-                task_str = f"{task} |"
+                    # 默认原先的格式
+                    gripper_str = (
+                        f"({gripper_pos[0]:.3f}, {gripper_pos[1]:.3f}, {gripper_pos[2]:.3f})"
+                        if gripper_pos is not None else None
+                    )
+                    object_str = (
+                        f"({object_pos[0]:.3f}, {object_pos[1]:.3f}, {object_pos[2]:.3f})"
+                        if object_pos is not None else None
+                    )
+                    if gripper_str and object_str:
+                        task_str = f"{task} | gripper at {gripper_str},sachet at {object_str}"
+                    elif gripper_str:
+                        task_str = f"{task} | gripper at {gripper_str}"
+                    elif object_str:
+                        task_str = f"{task} | sachet at {object_str}"
+                    else:
+                        task_str = f"{task} |"
 
+            else:
+                task_str = task
 
             updated_tasks.append(task_str)
 
         return updated_tasks
+
 
 
 

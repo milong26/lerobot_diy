@@ -174,16 +174,16 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
                 self.language_tip_mode = lang_mode
                 # 构造 obj_detector 实例并传入 mode
                 from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
-                self.obj_detector = VisionProcessor(mode=lang_mode)
+                self.obj_detector = VisionProcessor(mtask_mode=lang_mode)
         else:
             self.modify_task = False
             self.obj_detector = None
 
 
 
-        if self.modify_task:
-            from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
-            self.obj_detector = VisionProcessor(mtask_mode=mtask_mode)
+        # if self.modify_task:
+        #     from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
+        #     self.obj_detector = VisionProcessor(mtask_mode=mtask_mode)
 
         self.logger.info(f"Time taken to put policy on {self.device}: {end - start:.4f} seconds")
 
