@@ -207,7 +207,7 @@ class HILSerlRobotEnvConfig(EnvConfig):
     num_episodes: int = 10  # only for record mode
     episode: int = 0
     device: str = "cuda"
-    push_to_hub: bool = True
+    push_to_hub: bool = False
     pretrained_policy_name_or_path: str | None = None
     reward_classifier_pretrained_path: str | None = None
     # For the reward classifier, to record more positive examples after a success
@@ -258,7 +258,7 @@ class HILEnvConfig(EnvConfig):
     num_episodes: int = 10  # only for record mode
     episode: int = 0
     device: str = "cuda"
-    push_to_hub: bool = True
+    push_to_hub: bool = False
     pretrained_policy_name_or_path: str | None = None
     # For the reward classifier, to record more positive examples after a success
     number_of_steps_after_success: int = 0

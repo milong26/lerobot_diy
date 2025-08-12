@@ -533,10 +533,10 @@ class LeRobotDataset(torch.utils.data.Dataset):
 
 
 
-        # self.modified_tasks = load_modified_tasks("training_dataset/0727pickplace/first100/meta/modified_tasks_filled.jsonl")
+        # self.modified_tasks = load_modified_tasks("training_dataset/0803_with_red/pickplace/first100/meta/relative_task_grid.jsonl")
         self.modified_tasks=None
         if self.use_language_tip:
-            tip_filename = f"mtask_{cfg.language_tip_mode}.jsonl"
+            tip_filename = f"mtask_{self.language_tip_mode}.jsonl"
             tip_file = self.root / "meta" / tip_filename
             if not tip_file.exists():
                 raise FileNotFoundError(f"训练需要的文件不存在: {tip_file}")
@@ -842,6 +842,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
                 raise KeyError("一次getitem应该只获取一个")
             frame_idx=frame_idx[0]
             if hasattr(self, "modified_tasks") and ep_idx in self.modified_tasks and frame_idx in self.modified_tasks[ep_idx]:
+            # if ep_idx in self.modified_tasks and frame_idx in self.modified_tasks[ep_idx]:
                 item["task"] = self.modified_tasks[ep_idx][frame_idx]
             else:
                 task_idx = item["task_index"].item()
