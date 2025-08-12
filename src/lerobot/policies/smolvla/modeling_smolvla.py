@@ -368,9 +368,10 @@ class SmolVLAPolicy(PreTrainedPolicy):
 
         # self.language_tokenizer = AutoProcessor.from_pretrained(self.config.vlm_model_name).tokenizer
 
+        # 导入vlm_model
         self.config.vlm_model_name="models/forsmolvla/HuggingFaceTB/SmolVLM2-500M-Video-Instruct"
         self.language_tokenizer = AutoProcessor.from_pretrained(self.config.vlm_model_name, local_files_only=True).tokenizer
-        # self.language_tokenizer = AutoProcessor.from_pretrained("models/forsmolvla/HuggingFaceTB/SmolVLM2-500M-Video-Instruct", local_files_only=True).tokenizer
+    
         self.model = VLAFlowMatching(config)
         self.reset()
         # 为了能more step
@@ -387,6 +388,7 @@ class SmolVLAPolicy(PreTrainedPolicy):
         #     self.obj_detector=None
 
 
+    # 新建action queue
     def reset(self):
         """This should be called whenever the environment is reset."""
         self._queues = {
@@ -415,6 +417,7 @@ class SmolVLAPolicy(PreTrainedPolicy):
     def get_optim_params(self) -> dict:
         return self.parameters()
 
+    # 推理
     def _get_action_chunk(self, batch: dict[str, Tensor], noise: Tensor | None = None) -> Tensor:
         import copy
 
@@ -639,12 +642,13 @@ class SmolVLAPolicy(PreTrainedPolicy):
         to have batched tensors with the same length. 
         Perhaps your features (`input_ids` in this case) have excessive nesting (inputs type `list` where type `int` is expected).
         """
+        # 用了strcutured之后报错说token数量不一致，有的65，有的66
         tokenized_prompt = self.language_tokenizer.__call__(
             tasks,
-            padding=self.config.pad_language_to,
+            # padding=self.config.pad_language_to,
             padding_side="right",
-            # padding=True,
-            # truncation=True,       
+            padding=True,
+            truncation=True,       
             max_length=self.config.tokenizer_max_length,
             return_tensors="pt",
         )

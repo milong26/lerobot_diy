@@ -69,7 +69,7 @@ class TrainPipelineConfig(HubMixin):
     use_depth_image: bool=False
     use_force: bool=False
     use_language_tip: bool=False
-    language_tip_mode: str= "relative"
+    language_tip_mode: str= ""
 
     use_true_depth: bool=False
 
