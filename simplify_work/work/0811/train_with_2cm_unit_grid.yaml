@@ -1,0 +1,31 @@
+
+
+# 改用这个
+# nohup env CUDA_VISIBLE_DEVICES=2 HF_HUB_OFFLINE=1 PYTHONPATH=src   python -m lerobot.scripts.train   --config_path=simplify_work/work/train/train_0727_pickplace_100_language.yaml   --policy.path=models/forsmolvla/smolvla_base   --policy.repo_id=lerobot/smolvla_base   > logs/0727/train_100_depth_lang.log 2>&1 &
+# 查看
+
+dataset:
+  repo_id: lerobot/svla_so101_pickplace
+  root: training_dataset/0803_with_red/pickplace/first100
+
+batch_size: 64
+steps: 22000
+output_dir: outputs/train/0807/mtask_relative_grid_2cm
+job_name: training_pickplace_with_first100_relative_language_grid_2cm
+wandb:
+  enable: false
+
+policy:
+  device: cuda
+  repo_id: lerobot/smolvla_base
+  type: smolvla
+
+use_depth_image: false
+use_force: false
+use_language_tip: true
+use_true_depth: true
+# 这个和jsonl的文件名一致
+# 会找f"mtask_{self.language_tip_mode}.jsonl"的文件
+# mtask_relative_grid_1cm.jsonl
+
+language_tip_mode: relative_grid_2cm

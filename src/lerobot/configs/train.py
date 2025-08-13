@@ -70,6 +70,8 @@ class TrainPipelineConfig(HubMixin):
     use_force: bool=False
     use_language_tip: bool=False
     language_tip_mode: str= ""
+    # 为了将坐标加到state里面
+    add_location_to_state: bool=False
 
     use_true_depth: bool=False
 
