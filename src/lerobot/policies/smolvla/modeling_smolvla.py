@@ -189,14 +189,14 @@ def load_smolvla(
             len(unexpected),
         )
 
-     with torch.no_grad():
+    with torch.no_grad():
         input_dim = model.model.state_proj.weight.shape[1]
         # 原来 state 是 6 维，现在是 10 维，所以新增了 4 个维度
         last_new_idx = list(range(6, 10))
         nn.init.xavier_uniform_(model.model.state_proj.weight[:, last_new_idx])
         if model.model.state_proj.bias is not None:
             model.model.state_proj.bias.zero_()
-            self.logger.info("重置了state的6-9维的权重")
+            print("重置了state的6-9维的权重")
 
     return model
 
