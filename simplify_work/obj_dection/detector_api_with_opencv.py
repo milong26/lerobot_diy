@@ -171,10 +171,10 @@ class VisionProcessor:
         updated_tasks = []
 
         for rgb, depth, task in zip(rgb_batch, depth_batch, task_batch):
-            if "|" in task:
-                print("处理过了,pass")
-                updated_tasks.append(task)
-                continue
+            # if "|" in task:
+            #     print("处理过了,pass")
+            #     updated_tasks.append(task)
+            #     continue
 
             points_3d = self.process_sample(rgb, depth)
             task_str = task  # 默认原始 task
@@ -209,6 +209,36 @@ class VisionProcessor:
                                     f"({dx_grid}, {dy_grid}, {dz_grid}) in 5cm grid units.")
                     else:
                         task_str = task
+                # 结构化prompt需要修改
+                elif self.mtask_mode == "structural":
+                    pass
+                elif self.mtask_mode == "relative_grid_1cm":
+                    if gripper_pos is not None and object_pos is not None:
+                        dx = object_pos[0] - gripper_pos[0]
+                        dy = object_pos[1] - gripper_pos[1]
+                        dz = object_pos[2] - gripper_pos[2]
+                        # 5cm = 0.05m
+                        dx_grid = round(dx / 0.01)
+                        dy_grid = round(dy / 0.01)
+                        dz_grid = round(dz / 0.01)
+                        task_str = (f"{task}, sachet position relative to gripper is "
+                                    f"({dx_grid}, {dy_grid}, {dz_grid}) in 1cm grid units.")
+                    else:
+                        task_str = task
+                elif self.mtask_mode == "relative_grid_2cm":
+                    if gripper_pos is not None and object_pos is not None:
+                        dx = object_pos[0] - gripper_pos[0]
+                        dy = object_pos[1] - gripper_pos[1]
+                        dz = object_pos[2] - gripper_pos[2]
+                        # 5cm = 0.05m
+                        dx_grid = round(dx / 0.02)
+                        dy_grid = round(dy / 0.02)
+                        dz_grid = round(dz / 0.02)
+                        task_str = (f"{task}, sachet position relative to gripper is "
+                                    f"({dx_grid}, {dy_grid}, {dz_grid}) in 2cm grid units.")
+                    else:
+                        task_str = task
+
 
                 else:
                     # 默认原先的格式

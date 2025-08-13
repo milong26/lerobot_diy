@@ -58,7 +58,7 @@ class SmolVLAConfig(PreTrainedConfig):
     use_delta_joint_actions_aloha: bool = False
 
     # Tokenizer
-    tokenizer_max_length: int = 72
+    tokenizer_max_length: int = 48
 
     # Decoding
     num_steps: int = 10

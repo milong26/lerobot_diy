@@ -79,7 +79,7 @@ class FilteredBatchLoader:
         self.obj_detector = obj_detector
         self.save_task_path = Path(save_task_path) if save_task_path else None
 
-        # # 暂时不用了
+        # # # 暂时不用了
         # if self.save_task_path:
         #     self.save_task_path.parent.mkdir(parents=True, exist_ok=True)
         #     self.task_f = open(self.save_task_path, "a")
@@ -87,6 +87,51 @@ class FilteredBatchLoader:
     def __del__(self):
         if hasattr(self, "task_f") and not self.task_f.closed:
             self.task_f.close()
+
+       def add_location_to_state(self, batch):
+        """
+        从 batch 中提取坐标信息并拼接到 state:
+        state: [原6维, x, y, z, flag, padding...]
+        坐标缺失时 x, y, z = 0, flag = 0
+        """
+        # 取彩色图和深度图
+        rgb_batch = batch["observation.images.side"]
+        depth_batch = batch["observation.images.side_depth"]
+
+        new_states = []
+        for i in range(len(rgb_batch)):
+            # 原来的 state
+            orig_state = batch["state"][i]  # shape: [state_dim] 或 [seq_len, state_dim]
+            if orig_state.ndim > 1:  # 处理序列，取最后一帧
+                orig_state = orig_state[-1]
+
+            # 坐标默认 0
+            dx, dy, dz, flag = 0.0, 0.0, 0.0, 0.0
+
+            # 用 obj_detector 求相对坐标
+            points_3d = self.obj_detector.process_sample(rgb_batch[i], depth_batch[i])
+            if points_3d and len(points_3d) >= 2:
+                converted_3d = self.obj_detector.transform_camera_to_custom_coordsystem(points_3d)
+                gripper_pos, object_pos = converted_3d[0], converted_3d[1]
+
+                if gripper_pos is not None and object_pos is not None:
+                    dx = object_pos[0] - gripper_pos[0]
+                    dy = object_pos[1] - gripper_pos[1]
+                    dz = object_pos[2] - gripper_pos[2]
+                    flag = 1.0  # 有效
+
+            # 拼接：原 state + 坐标 + flag
+            merged_state = torch.cat([
+                orig_state, 
+                torch.tensor([dx, dy, dz, flag], dtype=orig_state.dtype)
+            ], dim=0)
+
+            new_states.append(merged_state)
+
+        # Stack 回 batch
+        new_states = torch.stack(new_states, dim=0)
+
+        return new_states
 
     def __iter__(self):
         for batch in self.dataloader:
@@ -114,6 +159,9 @@ class FilteredBatchLoader:
             #         self.obj_detector.print_statistics()
 
             # Step 2: now filter excluded keys
+            if cfg.add_location_to_state:
+                batch["state"]=add_location_to_state(batch)
+
             filtered_batch = {k: v for k, v in batch.items() if k not in self.exclude_keys}
 
             yield filtered_batch
@@ -263,13 +311,10 @@ def train(cfg: TrainPipelineConfig):
         exclude_features += ["observation.force", "observation.force_is_pad"]
     obj_detector = None
 
-    if cfg.use_language_tip:
+    if cfg.use_language_tip or cfg.add_location_to_state:
         from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
         obj_detector = VisionProcessor()
 
-    """
-    保存图片到本地
-    """
 
 
 

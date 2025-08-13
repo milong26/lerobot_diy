@@ -55,6 +55,7 @@ from lerobot.transport import (
     services_pb2_grpc,  # type: ignore
 )
 from lerobot.transport.utils import receive_bytes_in_chunks
+from pathlib import Path
 
 
 
@@ -172,6 +173,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             if lang_mode is not None:
                 self.modify_task = True
                 self.language_tip_mode = lang_mode
+                print("采用的language是",lang_mode)
                 # 构造 obj_detector 实例并传入 mode
                 from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
                 self.obj_detector = VisionProcessor(mtask_mode=lang_mode)
@@ -194,7 +196,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
     def SendObservations(self, request_iterator, context):  # noqa: N802
         """Receive observations from the robot client"""
         client_id = context.peer()
-        self.logger.debug(f"Receiving observations from {client_id}")
+        # self.logger.debug(f"Receiving observations from {client_id}")
 
         receive_time = time.time()  # comparing timestamps so need time.time()
         start_deserialize = time.perf_counter()
@@ -204,7 +206,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         timed_observation = pickle.loads(received_bytes)  # nosec
         deserialize_time = time.perf_counter() - start_deserialize
 
-        self.logger.debug(f"Received observation #{timed_observation.get_timestep()}")
+        # self.logger.debug(f"Received observation #{timed_observation.get_timestep()}")
 
         obs_timestep = timed_observation.get_timestep()
         obs_timestamp = timed_observation.get_timestamp()
@@ -212,23 +214,25 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         # Calculate FPS metrics
         fps_metrics = self.fps_tracker.calculate_fps_metrics(obs_timestamp)
 
-        self.logger.info(
-            f"Received observation #{obs_timestep} | "
-            f"Avg FPS: {fps_metrics['avg_fps']:.2f} | "  # fps at which observations are received from client
-            f"Target: {fps_metrics['target_fps']:.2f} | "
-            f"One-way latency: {(receive_time - obs_timestamp) * 1000:.2f}ms"
-        )
+        # self.logger.info(
+        #     f"Received observation #{obs_timestep} | "
+        #     f"Avg FPS: {fps_metrics['avg_fps']:.2f} | "  # fps at which observations are received from client
+        #     f"Target: {fps_metrics['target_fps']:.2f} | "
+        #     f"One-way latency: {(receive_time - obs_timestamp) * 1000:.2f}ms"
+        # )
 
-        self.logger.debug(
-            f"Server timestamp: {receive_time:.6f} | "
-            f"Client timestamp: {obs_timestamp:.6f} | "
-            f"Deserialization time: {deserialize_time:.6f}s"
-        )
+        # self.logger.debug(
+        #     f"Server timestamp: {receive_time:.6f} | "
+        #     f"Client timestamp: {obs_timestamp:.6f} | "
+        #     f"Deserialization time: {deserialize_time:.6f}s"
+        # )
 
         if not self._enqueue_observation(
             timed_observation  # wrapping a RawObservation
         ):
-            self.logger.info(f"Observation #{obs_timestep} has been filtered out")
+
+            # self.logger.info(f"Observation #{obs_timestep} has been filtered out")
+            pass
 
         return services_pb2.Empty()
 
@@ -265,17 +269,17 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             # Create and return the action chunk
             actions = services_pb2.Actions(data=actions_bytes)
 
-            self.logger.info(
-                f"Action chunk #{obs.get_timestep()} generated | "
-                f"Total time: {(inference_time + serialize_time) * 1000:.2f}ms"
-            )
+            # self.logger.info(
+            #     f"Action chunk #{obs.get_timestep()} generated | "
+            #     f"Total time: {(inference_time + serialize_time) * 1000:.2f}ms"
+            # )
 
-            self.logger.debug(
-                f"Action chunk #{obs.get_timestep()} generated | "
-                f"Inference time: {inference_time:.2f}s |"
-                f"Serialize time: {serialize_time:.2f}s |"
-                f"Total time: {inference_time + serialize_time:.2f}s"
-            )
+            # self.logger.debug(
+            #     f"Action chunk #{obs.get_timestep()} generated | "
+            #     f"Inference time: {inference_time:.2f}s |"
+            #     f"Serialize time: {serialize_time:.2f}s |"
+            #     f"Total time: {inference_time + serialize_time:.2f}s"
+            # )
 
             time.sleep(
                 max(0, self.config.inference_latency - max(0, time.perf_counter() - getactions_starts))
@@ -298,14 +302,14 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
         # 当前timestamp已经预测过
         if obs.get_timestep() in predicted_timesteps:
-            self.logger.debug(f"Skipping observation #{obs.get_timestep()} - Timestep predicted already!")
+            # self.logger.debug(f"Skipping observation #{obs.get_timestep()} - Timestep predicted already!")
             return False
         
         # observation和上一个近似。
         elif observations_similar(obs, previous_obs, lerobot_features=self.lerobot_features):
-            self.logger.debug(
-                f"Skipping observation #{obs.get_timestep()} - Observation too similar to last obs predicted!"
-            )
+            # self.logger.debug(
+            #     f"Skipping observation #{obs.get_timestep()} - Observation too similar to last obs predicted!"
+            # )
             return False
 
         else:
@@ -329,7 +333,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             if self.observation_queue.full():
                 # pops from queue
                 _ = self.observation_queue.get_nowait()
-                self.logger.debug("Observation queue was full, removed oldest observation")
+                # self.logger.debug("Observation queue was full, removed oldest observation")
 
             # Now put the new observation (never blocks as queue is non-full here)
             self.observation_queue.put(obs)
@@ -391,6 +395,9 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             depth_image=observation["observation.images.side_depth"]
             task_batch = [task]
             task=self.obj_detector.add_depth_info_to_task(colored_image,depth_image,task_batch)[0]
+            # 之前怎么没有加这一句
+            observation["task"]=task
+        print("目前的task内容：",observation["task"])
 
         """2. Get action chunk"""
         start_time = time.perf_counter()
@@ -408,19 +415,19 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         postprocessing_time = time.perf_counter() - start_time
         inference_stops = time.perf_counter()
 
-        self.logger.info(
-            f"Observation {observation_t.get_timestep()} |"
-            f"Inference time: {1000 * (inference_stops - inference_starts):.2f}ms"
-        )
+        # self.logger.info(
+        #     f"Observation {observation_t.get_timestep()} |"
+        #     f"Inference time: {1000 * (inference_stops - inference_starts):.2f}ms"
+        # )
 
         # full-process latency breakdown for debugging purposes
-        self.logger.debug(
-            f"Observation {observation_t.get_timestep()} | "
-            f"Preprocessing time: {1000 * (preprocessing_time - inference_starts):.2f}ms | "
-            f"Inference time: {1000 * (inference_time - preprocessing_time):.2f}ms | "
-            f"Postprocessing time: {1000 * (postprocessing_time - inference_time):.2f}ms | "
-            f"Total time: {1000 * (postprocessing_time - inference_starts):.2f}ms"
-        )
+        # self.logger.debug(
+        #     f"Observation {observation_t.get_timestep()} | "
+        #     f"Preprocessing time: {1000 * (preprocessing_time - inference_starts):.2f}ms | "
+        #     f"Inference time: {1000 * (inference_time - preprocessing_time):.2f}ms | "
+        #     f"Postprocessing time: {1000 * (postprocessing_time - inference_time):.2f}ms | "
+        #     f"Total time: {1000 * (postprocessing_time - inference_starts):.2f}ms"
+        # )
 
         return action_chunk
 
