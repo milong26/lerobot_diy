@@ -77,6 +77,8 @@ from lerobot.transport import (
     services_pb2_grpc,  # type: ignore
 )
 from lerobot.transport.utils import grpc_channel_options, send_bytes_in_chunks
+# 因为keyboard需要权限
+from pynput import keyboard
 
 
 class RobotClient:
@@ -114,6 +116,7 @@ class RobotClient:
             config.actions_per_chunk,
             config.policy_device,
             # 是否使用modified task
+            # 当modify_task为false的时候
             modify_task=config.use_language_tip
         )
         self.channel = grpc.insecure_channel(
@@ -146,8 +149,34 @@ class RobotClient:
         self.must_go.set()  # Initially set - observations qualify for direct processing
         # 距离
         self.latest_distance = None 
-        from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
-        self.obj_detector = VisionProcessor()
+        # from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
+        # self.obj_detector = VisionProcessor()
+        # 监听键盘输入->的时候清空action缓存
+        threading.Thread(target=self._listen_clear_key,daemon=True).start()
+        self.pause_until=0
+
+
+    def _listen_clear_key(self):
+        def on_press(key):
+            try:
+                if key==keyboard.Key.right:
+                    self.clear_action_queue()
+            except AttributeError:
+                self.logger.info("键盘出问题")
+        with keyboard.Listener(on_press=on_press) as listener:
+            listener.join()
+
+    def clear_action_queue(self,pause_seconds:float=3.0):
+        with self.action_queue_lock:
+            # while not self.action_queue.empty():
+                # self.action_queue.get_nowait()
+                # 直接新建队列
+                self.action_queue = Queue()
+        self.must_go.set()
+        self.logger.info("清空了actionqueue，顺便设置了mustgo，停个几秒")
+        # 要设置control_loop里面暂停
+        self.pause_until=time.time()+pause_seconds
+        # time.sleep(pause_seconds)
 
     @property
     def running(self):
@@ -376,103 +405,68 @@ class RobotClient:
         action = {key: action_tensor[i].item() for i, key in enumerate(self.robot.action_features)}
         return action
 
-    def control_loop_action(self, verbose: bool = False) -> dict[str, Any]:
-        """Reading and performing actions in local queue"""
-
-        # 根据distance决定一次趣N个动作
-        distance = obj_detector.opencv_detect_yellow_object()  # default to 0 if not set
-
-        # 决定取几个动作
-        if distance > self.config.high_distance_threshold:
-            num_actions = self.config.high_distance_action_aggregate  # e.g. 5
-        elif distance > self.config.low_distance_threshold:
-            num_actions = self.config.low_distance_action_aggregate  # e.g. 3
-        else:
-            num_actions = 1
-        # num_actions=1
-        # Lock only for queue operations
-        get_start = time.perf_counter()
-
-        # 一次取一个，线程安全地获取队列中的动作
-        timed_actions = []
-        with self.action_queue_lock:
-
-            # self.action_queue_size.append(self.action_queue.qsize())
-            # Get action from queue
-            # timed_action = self.action_queue.get_nowait()
-            # 一次取num_actions个
-            for _ in range(min(num_actions, self.action_queue.qsize())):
-                timed_actions.append(self.action_queue.get_nowait())
-            self.action_queue_size.append(self.action_queue.qsize())
-
-        if not timed_actions:
-            return {}
-        
-        # 平均动作
-        if len(timed_actions) == 1:
-            averaged_action = timed_actions[0]
-        else:
-            # stack tensors
-            action_stack = torch.stack([ta.get_action() for ta in timed_actions])
-            mean_action_tensor = torch.mean(action_stack, dim=0)
-
-            averaged_action = TimedAction(
-                timestamp=timed_actions[-1].get_timestamp(),
-                timestep=timed_actions[-1].get_timestep(),
-                action=mean_action_tensor,
-            )
-
-        get_end = time.perf_counter() - get_start
-
-        # 给robot实际运行的action指令
-        _performed_action = self.robot.send_action(
-            self._action_tensor_to_action_dict(averaged_action.get_action())
-        )
-        with self.latest_action_lock:
-            self.latest_action = averaged_action.get_timestep()
-
-        if verbose:
-            with self.action_queue_lock:
-                current_queue_size = self.action_queue.qsize()
-
-            self.logger.debug(
-                f"Ts={averaged_action.get_timestamp()} | "
-                f"Action #{averaged_action.get_timestep()} performed | "
-                f"Queue size: {current_queue_size}"
-            )
-
-            self.logger.debug(
-                f"Popping action from queue to perform took {get_end:.6f}s | Queue size: {current_queue_size}"
-            )
-
-        return _performed_action
-
-
-
     # def control_loop_action(self, verbose: bool = False) -> dict[str, Any]:
     #     """Reading and performing actions in local queue"""
 
+    #     # 根据distance决定一次趣N个动作
+    #     # distance = obj_detector.opencv_detect_yellow_object()  # default to 0 if not set
+
+    #     # 决定取几个动作
+    #     if distance > self.config.high_distance_threshold:
+    #         num_actions = self.config.high_distance_action_aggregate  # e.g. 5
+    #     elif distance > self.config.low_distance_threshold:
+    #         num_actions = self.config.low_distance_action_aggregate  # e.g. 3
+    #     else:
+    #         num_actions = 1
+    #     # num_actions=1
     #     # Lock only for queue operations
     #     get_start = time.perf_counter()
+
+    #     # 一次取一个，线程安全地获取队列中的动作
+    #     timed_actions = []
     #     with self.action_queue_lock:
-    #         self.action_queue_size.append(self.action_queue.qsize())
+
+    #         # self.action_queue_size.append(self.action_queue.qsize())
     #         # Get action from queue
-    #         timed_action = self.action_queue.get_nowait()
+    #         # timed_action = self.action_queue.get_nowait()
+    #         # 一次取num_actions个
+    #         for _ in range(min(num_actions, self.action_queue.qsize())):
+    #             timed_actions.append(self.action_queue.get_nowait())
+    #         self.action_queue_size.append(self.action_queue.qsize())
+
+    #     if not timed_actions:
+    #         return {}
+        
+    #     # 平均动作
+    #     if len(timed_actions) == 1:
+    #         averaged_action = timed_actions[0]
+    #     else:
+    #         # stack tensors
+    #         action_stack = torch.stack([ta.get_action() for ta in timed_actions])
+    #         mean_action_tensor = torch.mean(action_stack, dim=0)
+
+    #         averaged_action = TimedAction(
+    #             timestamp=timed_actions[-1].get_timestamp(),
+    #             timestep=timed_actions[-1].get_timestep(),
+    #             action=mean_action_tensor,
+    #         )
+
     #     get_end = time.perf_counter() - get_start
 
+    #     # 给robot实际运行的action指令
     #     _performed_action = self.robot.send_action(
-    #         self._action_tensor_to_action_dict(timed_action.get_action())
+    #         self._action_tensor_to_action_dict(averaged_action.get_action())
     #     )
     #     with self.latest_action_lock:
-    #         self.latest_action = timed_action.get_timestep()
+    #         self.latest_action = averaged_action.get_timestep()
 
     #     if verbose:
     #         with self.action_queue_lock:
     #             current_queue_size = self.action_queue.qsize()
 
     #         self.logger.debug(
-    #             f"Ts={timed_action.get_timestamp()} | "
-    #             f"Action #{timed_action.get_timestep()} performed | "
+    #             f"Ts={averaged_action.get_timestamp()} | "
+    #             f"Action #{averaged_action.get_timestep()} performed | "
     #             f"Queue size: {current_queue_size}"
     #         )
 
@@ -481,6 +475,41 @@ class RobotClient:
     #         )
 
     #     return _performed_action
+
+
+
+    def control_loop_action(self, verbose: bool = False) -> dict[str, Any]:
+        """Reading and performing actions in local queue"""
+
+        # Lock only for queue operations
+        get_start = time.perf_counter()
+        with self.action_queue_lock:
+            self.action_queue_size.append(self.action_queue.qsize())
+            # Get action from queue
+            timed_action = self.action_queue.get_nowait()
+        get_end = time.perf_counter() - get_start
+
+        _performed_action = self.robot.send_action(
+            self._action_tensor_to_action_dict(timed_action.get_action())
+        )
+        with self.latest_action_lock:
+            self.latest_action = timed_action.get_timestep()
+
+        if verbose:
+            with self.action_queue_lock:
+                current_queue_size = self.action_queue.qsize()
+
+            self.logger.debug(
+                f"Ts={timed_action.get_timestamp()} | "
+                f"Action #{timed_action.get_timestep()} performed | "
+                f"Queue size: {current_queue_size}"
+            )
+
+            self.logger.debug(
+                f"Popping action from queue to perform took {get_end:.6f}s | Queue size: {current_queue_size}"
+            )
+
+        return _performed_action
 
     def _ready_to_send_observation(self):
         """Flags when the client is ready to send an observation"""
@@ -547,6 +576,13 @@ class RobotClient:
         _captured_observation = None
 
         while self.running:
+
+            # 右键清空，暂停几秒
+            if time.time()<self.pause_until:
+                time.sleep(0.1)
+                continue
+
+        
             control_loop_start = time.perf_counter()
             """Control loop: (1) Performing actions, when available"""
             if self.actions_available():
@@ -556,7 +592,7 @@ class RobotClient:
             if self._ready_to_send_observation():
                 _captured_observation = self.control_loop_observation(task, verbose)
 
-            self.logger.info(f"Control loop (ms): {(time.perf_counter() - control_loop_start) * 1000:.2f}")
+            self.logger.info(f"Control loop (ms): {(time.perf_counter() - control_loop_start) * 1000:.2f},剩下的{self.action_queue.qsize()}")
             # Dynamically adjust sleep time to maintain the desired control frequency
             time.sleep(max(0, self.config.environment_dt - (time.perf_counter() - control_loop_start)))
 
