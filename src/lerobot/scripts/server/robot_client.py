@@ -149,8 +149,8 @@ class RobotClient:
         self.must_go.set()  # Initially set - observations qualify for direct processing
         # 距离
         self.latest_distance = None 
-        # from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
-        # self.obj_detector = VisionProcessor()
+        from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
+        self.obj_detector = VisionProcessor()
         # 监听键盘输入->的时候清空action缓存
         threading.Thread(target=self._listen_clear_key,daemon=True).start()
         self.pause_until=0
@@ -405,103 +405,68 @@ class RobotClient:
         action = {key: action_tensor[i].item() for i, key in enumerate(self.robot.action_features)}
         return action
 
-    # def control_loop_action(self, verbose: bool = False) -> dict[str, Any]:
-    #     """Reading and performing actions in local queue"""
-
-    #     # 根据distance决定一次趣N个动作
-    #     # distance = obj_detector.opencv_detect_yellow_object()  # default to 0 if not set
-
-    #     # 决定取几个动作
-    #     if distance > self.config.high_distance_threshold:
-    #         num_actions = self.config.high_distance_action_aggregate  # e.g. 5
-    #     elif distance > self.config.low_distance_threshold:
-    #         num_actions = self.config.low_distance_action_aggregate  # e.g. 3
-    #     else:
-    #         num_actions = 1
-    #     # num_actions=1
-    #     # Lock only for queue operations
-    #     get_start = time.perf_counter()
-
-    #     # 一次取一个，线程安全地获取队列中的动作
-    #     timed_actions = []
-    #     with self.action_queue_lock:
-
-    #         # self.action_queue_size.append(self.action_queue.qsize())
-    #         # Get action from queue
-    #         # timed_action = self.action_queue.get_nowait()
-    #         # 一次取num_actions个
-    #         for _ in range(min(num_actions, self.action_queue.qsize())):
-    #             timed_actions.append(self.action_queue.get_nowait())
-    #         self.action_queue_size.append(self.action_queue.qsize())
-
-    #     if not timed_actions:
-    #         return {}
-        
-    #     # 平均动作
-    #     if len(timed_actions) == 1:
-    #         averaged_action = timed_actions[0]
-    #     else:
-    #         # stack tensors
-    #         action_stack = torch.stack([ta.get_action() for ta in timed_actions])
-    #         mean_action_tensor = torch.mean(action_stack, dim=0)
-
-    #         averaged_action = TimedAction(
-    #             timestamp=timed_actions[-1].get_timestamp(),
-    #             timestep=timed_actions[-1].get_timestep(),
-    #             action=mean_action_tensor,
-    #         )
-
-    #     get_end = time.perf_counter() - get_start
-
-    #     # 给robot实际运行的action指令
-    #     _performed_action = self.robot.send_action(
-    #         self._action_tensor_to_action_dict(averaged_action.get_action())
-    #     )
-    #     with self.latest_action_lock:
-    #         self.latest_action = averaged_action.get_timestep()
-
-    #     if verbose:
-    #         with self.action_queue_lock:
-    #             current_queue_size = self.action_queue.qsize()
-
-    #         self.logger.debug(
-    #             f"Ts={averaged_action.get_timestamp()} | "
-    #             f"Action #{averaged_action.get_timestep()} performed | "
-    #             f"Queue size: {current_queue_size}"
-    #         )
-
-    #         self.logger.debug(
-    #             f"Popping action from queue to perform took {get_end:.6f}s | Queue size: {current_queue_size}"
-    #         )
-
-    #     return _performed_action
-
-
-
     def control_loop_action(self, verbose: bool = False) -> dict[str, Any]:
         """Reading and performing actions in local queue"""
 
+        # 根据distance决定一次趣N个动作
+        distance = self.latest_distance
+
+        # 决定取几个动作
+        if distance > self.config.high_distance_threshold:
+            num_actions = self.config.high_distance_action_aggregate  # e.g. 5
+        elif distance > self.config.low_distance_threshold:
+            num_actions = self.config.low_distance_action_aggregate  # e.g. 3
+        else:
+            num_actions = 1
+        # num_actions=1
         # Lock only for queue operations
         get_start = time.perf_counter()
+
+        # 一次取一个，线程安全地获取队列中的动作
+        timed_actions = []
         with self.action_queue_lock:
-            self.action_queue_size.append(self.action_queue.qsize())
+
+            # self.action_queue_size.append(self.action_queue.qsize())
             # Get action from queue
-            timed_action = self.action_queue.get_nowait()
+            # timed_action = self.action_queue.get_nowait()
+            # 一次取num_actions个
+            for _ in range(min(num_actions, self.action_queue.qsize())):
+                timed_actions.append(self.action_queue.get_nowait())
+            self.action_queue_size.append(self.action_queue.qsize())
+
+        if not timed_actions:
+            return {}
+        
+        # 平均动作
+        if len(timed_actions) == 1:
+            averaged_action = timed_actions[0]
+        else:
+            # stack tensors
+            action_stack = torch.stack([ta.get_action() for ta in timed_actions])
+            mean_action_tensor = torch.mean(action_stack, dim=0)
+
+            averaged_action = TimedAction(
+                timestamp=timed_actions[-1].get_timestamp(),
+                timestep=timed_actions[-1].get_timestep(),
+                action=mean_action_tensor,
+            )
+
         get_end = time.perf_counter() - get_start
 
+        # 给robot实际运行的action指令
         _performed_action = self.robot.send_action(
-            self._action_tensor_to_action_dict(timed_action.get_action())
+            self._action_tensor_to_action_dict(averaged_action.get_action())
         )
         with self.latest_action_lock:
-            self.latest_action = timed_action.get_timestep()
+            self.latest_action = averaged_action.get_timestep()
 
         if verbose:
             with self.action_queue_lock:
                 current_queue_size = self.action_queue.qsize()
 
             self.logger.debug(
-                f"Ts={timed_action.get_timestamp()} | "
-                f"Action #{timed_action.get_timestep()} performed | "
+                f"Ts={averaged_action.get_timestamp()} | "
+                f"Action #{averaged_action.get_timestep()} performed | "
                 f"Queue size: {current_queue_size}"
             )
 
@@ -510,6 +475,41 @@ class RobotClient:
             )
 
         return _performed_action
+
+
+
+    # def control_loop_action(self, verbose: bool = False) -> dict[str, Any]:
+    #     """Reading and performing actions in local queue"""
+
+    #     # Lock only for queue operations
+    #     get_start = time.perf_counter()
+    #     with self.action_queue_lock:
+    #         self.action_queue_size.append(self.action_queue.qsize())
+    #         # Get action from queue
+    #         timed_action = self.action_queue.get_nowait()
+    #     get_end = time.perf_counter() - get_start
+
+    #     _performed_action = self.robot.send_action(
+    #         self._action_tensor_to_action_dict(timed_action.get_action())
+    #     )
+    #     with self.latest_action_lock:
+    #         self.latest_action = timed_action.get_timestep()
+
+    #     if verbose:
+    #         with self.action_queue_lock:
+    #             current_queue_size = self.action_queue.qsize()
+
+    #         self.logger.debug(
+    #             f"Ts={timed_action.get_timestamp()} | "
+    #             f"Action #{timed_action.get_timestep()} performed | "
+    #             f"Queue size: {current_queue_size}"
+    #         )
+
+    #         self.logger.debug(
+    #             f"Popping action from queue to perform took {get_end:.6f}s | Queue size: {current_queue_size}"
+    #         )
+
+    #     return _performed_action
 
     def _ready_to_send_observation(self):
         """Flags when the client is ready to send an observation"""
@@ -532,6 +532,10 @@ class RobotClient:
                 observation=raw_observation,
                 timestep=max(latest_action, 0),
             )
+
+            # 更新距离
+            print(observation.observation)
+            self.latest_distance=self.obj_dection.count_distance(color_image=observation.observation["side"],depth_image=observation.observation["side_depth"])
 
             obs_capture_time = time.perf_counter() - start_time
 
