@@ -28,7 +28,7 @@ task: "pick up the pyramid-shaped sachet and place it into the box"
 
 policy_type: smolvla
 # POLICY: the model name/path on server to the checkpoint to run (e.g., lerobot/smolvla_base)
-pretrained_name_or_path: outputs/train/0807/mtask_relative/checkpoints/022000/pretrained_model
+pretrained_name_or_path: outputs/train/0807/mtask_relative_grid_1cm/checkpoints/022000/pretrained_model
 # pretrained_name_or_path: outputs/train/0807/mtask_relative_grid/checkpoints/022000/pretrained_model
 # pretrained_name_or_path: outputs/train/0804/baseline_100/checkpoints/022000/pretrained_model
 policy_device: cuda

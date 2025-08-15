@@ -1,0 +1,1 @@
+from . import detector_api_with_opencv
