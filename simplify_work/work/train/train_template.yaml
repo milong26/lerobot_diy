@@ -1,16 +1,16 @@
 
 
-# nohup env CUDA_VISIBLE_DEVICES=2 HF_HUB_OFFLINE=1 PYTHONPATH=src   python -m lerobot.scripts.train   --config_path=simplify_work/work/train/train_0727_pickplace_100_language.yaml   --policy.path=models/forsmolvla/smolvla_base   --policy.repo_id=lerobot/smolvla_base   > logs/0727/train_100_depth_lang.log 2>&1 &
+# nohup env CUDA_VISIBLE_DEVICES=0 HF_HUB_OFFLINE=1 PYTHONPATH=src   python -m lerobot.scripts.train   --config_path=simplify_work/work/train/train_template.yaml   --policy.path=models/forsmolvla/smolvla_base   --policy.repo_id=lerobot/smolvla_base   > logs/0727/train_100_depth_lang.log 2>&1 &
 
 
 dataset:
   repo_id: lerobot/svla_so101_pickplace
-  root: training_dataset/0727pickplace/first100
+  root: training_dataset/0803_with_red/pickplace/first100
 
 batch_size: 64
 steps: 22000
-output_dir: outputs/train/0727/depth_100_baseline
-job_name: training_pickplace_with_first100_baseline
+output_dir: outputs/train/test/test
+job_name: training_test
 wandb:
   enable: false
 
@@ -18,7 +18,12 @@ policy:
   device: cuda
   repo_id: lerobot/smolvla_base
   type: smolvla
+  push_to_hub: false
 
 # 自定义内容
-language_tip_mode: str="", # 当空的时候就等于baseline
-add_location_to_state: bool = False,   # 控制是将location加到state里面
+
+# 当空的时候就等于baseline
+# 会找数据集里面f"mtask_{self.language_tip_mode}.jsonl"的文件
+language_tip_mode: "relative_grid_2cm" 
+# 控制是将location加到state里面
+add_location_to_state:  true

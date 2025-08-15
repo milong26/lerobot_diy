@@ -477,7 +477,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         self.episodes_since_last_encoding = 0
         # 根据train新增，默认是false
         self.language_tip_mode=language_tip_mode
-        self.add_location_to_state-add_location_to_state
+        self.add_location_to_state=add_location_to_state
         self.exclude_features = set(exclude_features or [])
         self.obj_detector = obj_detector
 
@@ -543,10 +543,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
     # 这个过程需要在获得state之后,filter之前
     def _add_location_to_state(self, item):
         """从 item 中计算 gripper-object 相对坐标并拼接到 state"""
-        orig_state = item["state"]
-        if orig_state.ndim > 1:  # 如果是序列，取最后一帧
-            orig_state = orig_state[-1]
-
+        orig_state = item["observation.state"]
         dx, dy, dz, flag = 0.0, 0.0, 0.0, 0.0
         if self.obj_detector:
             rgb = item["observation.images.side"]
@@ -559,9 +556,9 @@ class LeRobotDataset(torch.utils.data.Dataset):
                     dy = object_pos[1] - gripper_pos[1]
                     dz = object_pos[2] - gripper_pos[2]
                     flag = 1.0
-
-        merged_state = torch.cat([orig_state, torch.tensor([dx, dy, dz, flag], dtype=orig_state.dtype)], dim=0)
-        item["state"] = merged_state
+    
+        merged_state = torch.cat([orig_state, torch.tensor([[dx, dy, dz, flag]], dtype=orig_state.dtype)], dim=1)
+        item["observation.state"] = merged_state
         return item
     
 
@@ -837,8 +834,6 @@ class LeRobotDataset(torch.utils.data.Dataset):
         frame_idx = [
             i - episode_start_idx for i in query_indices['observation.images.side_depth']
         ]
-        if not len(frame_idx) == 1:
-            raise KeyError("说好只读一个呢")
         # frame_idx=frame_idx[0]
         if len(self.meta.video_keys) > 0:
             current_ts = item["timestamp"].item()
@@ -865,7 +860,6 @@ class LeRobotDataset(torch.utils.data.Dataset):
             if hasattr(self, "modified_tasks") and ep_idx in self.modified_tasks and frame_idx in self.modified_tasks[ep_idx]:
             # if ep_idx in self.modified_tasks and frame_idx in self.modified_tasks[ep_idx]:
                 item["task"] = self.modified_tasks[ep_idx][frame_idx]
-                print()
             else:
                 task_idx = item["task_index"].item()
                 item["task"] = self.meta.tasks[task_idx]
@@ -877,10 +871,10 @@ class LeRobotDataset(torch.utils.data.Dataset):
         # add_location_to_state
         if self.add_location_to_state:
             item = self._add_location_to_state(item)
-
         # 过滤无用 key
         if self.exclude_features:
             item = {k: v for k, v in item.items() if k not in self.exclude_features}
+        
         return item
 
     def __repr__(self):

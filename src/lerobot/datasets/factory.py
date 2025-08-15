@@ -99,7 +99,7 @@ def make_dataset(cfg: TrainPipelineConfig) -> LeRobotDataset | MultiLeRobotDatas
         # 目前训练默认不适用深度
         exclude_features += ["observation.images.side_depth", "observation.images.side_depth_is_pad"]
         # if not cfg.use_force:
-        #     exclude_features += ["observation.force", "observation.force_is_pad"]
+        exclude_features += ["observation.force", "observation.force_is_pad"]
 
         dataset = LeRobotDataset(
             cfg.dataset.repo_id,

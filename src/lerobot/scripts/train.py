@@ -194,11 +194,11 @@ def train(cfg: TrainPipelineConfig):
 
 
         # 检查
-    peek_batch = next(iter(raw_dataloader))
-    print("真正训练的时候甬道的feature：", list(peek_batch.keys()))
-    print("task示例",peek_batch["task"][0])
-    print("state示例",peek_batch["state"][0]))
-    raise KeyError("输出检查")
+    # peek_batch = next(iter(raw_dataloader))
+    # print("真正训练的时候甬道的feature：", list(peek_batch.keys()))
+    # print("task示例",peek_batch["task"][0])
+    # print("state示例",peek_batch["observation.state"][0])
+    # raise KeyError("输出检查")
 
 
     # start train
