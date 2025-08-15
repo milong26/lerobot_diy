@@ -63,17 +63,9 @@ class TrainPipelineConfig(HubMixin):
     scheduler: LRSchedulerConfig | None = None
     eval: EvalConfig = field(default_factory=EvalConfig)
     wandb: WandBConfig = field(default_factory=WandBConfig)
-    """
-    为了在多模态里面选择用/不用depth_image，默认为false。scripts/train.py
-    """
-    use_depth_image: bool=False
-    use_force: bool=False
-    use_language_tip: bool=False
-    language_tip_mode: str= ""
-    # 为了将坐标加到state里面
-    add_location_to_state: bool=False
-
-    use_true_depth: bool=False
+    # 自定义
+    language_tip_mode: str="", # 当空的时候就等于baseline   
+    add_location_to_state: bool = False,   # 控制是将location加到state里面
 
     def __post_init__(self):
         self.checkpoint_path = None

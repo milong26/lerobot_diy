@@ -1,0 +1,24 @@
+
+
+# nohup env CUDA_VISIBLE_DEVICES=2 HF_HUB_OFFLINE=1 PYTHONPATH=src   python -m lerobot.scripts.train   --config_path=simplify_work/work/train/train_0727_pickplace_100_language.yaml   --policy.path=models/forsmolvla/smolvla_base   --policy.repo_id=lerobot/smolvla_base   > logs/0727/train_100_depth_lang.log 2>&1 &
+
+
+dataset:
+  repo_id: lerobot/svla_so101_pickplace
+  root: training_dataset/0727pickplace/first100
+
+batch_size: 64
+steps: 22000
+output_dir: outputs/train/0727/depth_100_baseline
+job_name: training_pickplace_with_first100_baseline
+wandb:
+  enable: false
+
+policy:
+  device: cuda
+  repo_id: lerobot/smolvla_base
+  type: smolvla
+
+# 自定义内容
+language_tip_mode: str="", # 当空的时候就等于baseline
+add_location_to_state: bool = False,   # 控制是将location加到state里面

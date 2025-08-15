@@ -354,12 +354,11 @@ class LeRobotDataset(torch.utils.data.Dataset):
         download_videos: bool = True,
         video_backend: str | None = None,
         batch_encoding_size: int = 1,
-        # train:为了控制是否使用真~深度图片而不是采用有损失的视频
-        use_true_depth: bool= False,
-        use_language_tip: bool= False,
-        language_tip_mode: str="",
-        # record:控制录制的时候是否保存images文件夹
-        save_image_folder: bool = True
+        # 下面是为了train的自定义内容
+        language_tip_mode: str="", # 当空的时候就等于baseline
+        add_location_to_state: bool = False,   # 控制是将location加到state里面
+        exclude_features: list[str] = None,    # 控制需要过滤的 key，最终的训练（主要是为了过滤掉depth）
+        obj_detector=None,                     # 可选的目标检测器，为了state加的
     ):
         """
         2 modes are available for instantiating this class, depending on 2 different use cases:
@@ -477,12 +476,10 @@ class LeRobotDataset(torch.utils.data.Dataset):
         self.batch_encoding_size = batch_encoding_size
         self.episodes_since_last_encoding = 0
         # 根据train新增，默认是false
-        self.use_true_depth=use_true_depth
-        self.use_language_tip=use_language_tip
         self.language_tip_mode=language_tip_mode
-        # 根据collect新增，默认是True
-        self.save_image_folder=save_image_folder
-        print("设定self.save_image_folder",self.save_image_folder)
+        self.add_location_to_state-add_location_to_state
+        self.exclude_features = set(exclude_features or [])
+        self.obj_detector = obj_detector
 
         # Unused attributes
         self.image_writer = None
@@ -531,18 +528,42 @@ class LeRobotDataset(torch.utils.data.Dataset):
             if ep_idx not in self.episode_start_indices:
                 self.episode_start_indices[ep_idx] = idx
 
-
-
         # self.modified_tasks = load_modified_tasks("training_dataset/0803_with_red/pickplace/first100/meta/relative_task_grid.jsonl")
         self.modified_tasks=None
-        if self.use_language_tip:
+        if self.language_tip_mode:
             tip_filename = f"mtask_{self.language_tip_mode}.jsonl"
             tip_file = self.root / "meta" / tip_filename
             if not tip_file.exists():
                 raise FileNotFoundError(f"训练需要的文件不存在: {tip_file}")
-
             self.modified_tasks = load_modified_tasks(tip_file)
+            print("self.modified_tasks举例：",self.modified_tasks[0][0])
 
+
+    # 先按照6+4拼接，返回state
+    # 这个过程需要在获得state之后,filter之前
+    def _add_location_to_state(self, item):
+        """从 item 中计算 gripper-object 相对坐标并拼接到 state"""
+        orig_state = item["state"]
+        if orig_state.ndim > 1:  # 如果是序列，取最后一帧
+            orig_state = orig_state[-1]
+
+        dx, dy, dz, flag = 0.0, 0.0, 0.0, 0.0
+        if self.obj_detector:
+            rgb = item["observation.images.side"]
+            depth = item.get("observation.images.side_depth", None)
+            points_3d = self.obj_detector.process_sample(rgb, depth)
+            if points_3d and len(points_3d) >= 2:
+                gripper_pos, object_pos = self.obj_detector.transform_camera_to_custom_coordsystem(points_3d)[:2]
+                if gripper_pos is not None and object_pos is not None:
+                    dx = object_pos[0] - gripper_pos[0]
+                    dy = object_pos[1] - gripper_pos[1]
+                    dz = object_pos[2] - gripper_pos[2]
+                    flag = 1.0
+
+        merged_state = torch.cat([orig_state, torch.tensor([dx, dy, dz, flag], dtype=orig_state.dtype)], dim=0)
+        item["state"] = merged_state
+        return item
+    
 
 
     def push_to_hub(
@@ -776,8 +797,8 @@ class LeRobotDataset(torch.utils.data.Dataset):
         item = {}
         
         for vid_key, query_ts in query_timestamps.items():
-            # 当use_true_depth且vid_key此时含有depth的时候,传入图片index,直接从本地得到图片
-            if self.use_true_depth and "depth" in vid_key:
+            # vid_key此时含有depth的时候,传入图片index,直接从本地得到图片
+            if "depth" in vid_key:
                 frames = self.read_image_frames_from_disk(
                     vid_key,
                     ep_idx, 
@@ -836,7 +857,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         # Add task as a string
         # 原来准备用yolo的，0804重新采集数据之后可以用opencv直接定位了
         # 但是准确率不准，有缺失，训练数据还是用干净的比较好
-        if self.use_language_tip:
+        if self.language_tip_mode and self.modified_tasks:
             # 从本地读取
             if not len(frame_idx) == 1:
                 raise KeyError("一次getitem应该只获取一个")
@@ -844,6 +865,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
             if hasattr(self, "modified_tasks") and ep_idx in self.modified_tasks and frame_idx in self.modified_tasks[ep_idx]:
             # if ep_idx in self.modified_tasks and frame_idx in self.modified_tasks[ep_idx]:
                 item["task"] = self.modified_tasks[ep_idx][frame_idx]
+                print()
             else:
                 task_idx = item["task_index"].item()
                 item["task"] = self.meta.tasks[task_idx]
@@ -852,9 +874,13 @@ class LeRobotDataset(torch.utils.data.Dataset):
             task_idx = item["task_index"].item()
             item["task"] = self.meta.tasks[task_idx]
 
+        # add_location_to_state
+        if self.add_location_to_state:
+            item = self._add_location_to_state(item)
 
-
-
+        # 过滤无用 key
+        if self.exclude_features:
+            item = {k: v for k, v in item.items() if k not in self.exclude_features}
         return item
 
     def __repr__(self):

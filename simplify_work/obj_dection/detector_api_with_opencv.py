@@ -241,7 +241,7 @@ class VisionProcessor:
 
 
                 else:
-                    # 默认原先的格式
+                    # 这个版本应该没用了，最多拿来计算
                     gripper_str = (
                         f"({gripper_pos[0]:.3f}, {gripper_pos[1]:.3f}, {gripper_pos[2]:.3f})"
                         if gripper_pos is not None else None

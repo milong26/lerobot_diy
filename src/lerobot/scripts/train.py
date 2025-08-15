@@ -54,120 +54,10 @@ from lerobot.utils.wandb_utils import WandBLogger
 
 # https://github.com/huggingface/lerobot/issues/1377
 import os
-# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-
-# # train.py 开头
-# import os
-
-# import torch.multiprocessing as mp
-# mp.set_start_method("spawn", force=True)
-
-
-# 为了filter raw dataset
 import json
 from pathlib import Path
-
-import json
-from pathlib import Path
-
-class FilteredBatchLoader:
-    def __init__(self, dataloader, exclude_keys: list, obj_detector=None, save_task_path='training_dataset/0803_with_red/pickplace/first100/pickplace/meta/modified_tasks.jsonl'):
-        self.dataloader = dataloader
-        self.exclude_keys = set(exclude_keys)
-        self.obj_detector = obj_detector
-        self.save_task_path = Path(save_task_path) if save_task_path else None
-
-        # # # 暂时不用了
-        # if self.save_task_path:
-        #     self.save_task_path.parent.mkdir(parents=True, exist_ok=True)
-        #     self.task_f = open(self.save_task_path, "a")
-
-    def __del__(self):
-        if hasattr(self, "task_f") and not self.task_f.closed:
-            self.task_f.close()
-
-       def add_location_to_state(self, batch):
-        """
-        从 batch 中提取坐标信息并拼接到 state:
-        state: [原6维, x, y, z, flag, padding...]
-        坐标缺失时 x, y, z = 0, flag = 0
-        """
-        # 取彩色图和深度图
-        rgb_batch = batch["observation.images.side"]
-        depth_batch = batch["observation.images.side_depth"]
-
-        new_states = []
-        for i in range(len(rgb_batch)):
-            # 原来的 state
-            orig_state = batch["state"][i]  # shape: [state_dim] 或 [seq_len, state_dim]
-            if orig_state.ndim > 1:  # 处理序列，取最后一帧
-                orig_state = orig_state[-1]
-
-            # 坐标默认 0
-            dx, dy, dz, flag = 0.0, 0.0, 0.0, 0.0
-
-            # 用 obj_detector 求相对坐标
-            points_3d = self.obj_detector.process_sample(rgb_batch[i], depth_batch[i])
-            if points_3d and len(points_3d) >= 2:
-                converted_3d = self.obj_detector.transform_camera_to_custom_coordsystem(points_3d)
-                gripper_pos, object_pos = converted_3d[0], converted_3d[1]
-
-                if gripper_pos is not None and object_pos is not None:
-                    dx = object_pos[0] - gripper_pos[0]
-                    dy = object_pos[1] - gripper_pos[1]
-                    dz = object_pos[2] - gripper_pos[2]
-                    flag = 1.0  # 有效
-
-            # 拼接：原 state + 坐标 + flag
-            merged_state = torch.cat([
-                orig_state, 
-                torch.tensor([dx, dy, dz, flag], dtype=orig_state.dtype)
-            ], dim=0)
-
-            new_states.append(merged_state)
-
-        # Stack 回 batch
-        new_states = torch.stack(new_states, dim=0)
-
-        return new_states
-
-    def __iter__(self):
-        for batch in self.dataloader:
-            # Step 1: apply obj_detector before excluding keys
-            # if self.obj_detector is not None:
-            #     images = batch.get("observation.images.side").cpu()
-            #     depths = batch.get("observation.images.side_depth").cpu()
-            #     tasks = batch.get("task")
-
-            #     if images is not None and depths is not None and tasks is not None:
-            #         new_tasks = self.obj_detector.add_depth_info_to_task(images, depths, tasks)
-            #         batch["task"] = new_tasks
-
-            #         if self.save_task_path:
-            #             ep_indices = batch.get("episode_index", [])
-            #             frame_indices = batch.get("frame_index", [])
-            #             for ep, frame, task in zip(ep_indices, frame_indices, new_tasks):
-            #                 record = {
-            #                     "episode_index": int(ep.item()),
-            #                     "frame_index": int(frame.item()),
-            #                     "task": task,
-            #                 }
-            #                 self.task_f.write(json.dumps(record) + "\n")
-
-            #         self.obj_detector.print_statistics()
-
-            # Step 2: now filter excluded keys
-            if cfg.add_location_to_state:
-                batch["state"]=add_location_to_state(batch)
-
-            filtered_batch = {k: v for k, v in batch.items() if k not in self.exclude_keys}
-
-            yield filtered_batch
-
-
-
 
 def update_policy(
     train_metrics: MetricsTracker,
@@ -241,7 +131,6 @@ def train(cfg: TrainPipelineConfig):
     torch.backends.cuda.matmul.allow_tf32 = True
 
     logging.info("Creating dataset")
-    # make_dataset接收的就是cfg
     dataset = make_dataset(cfg)
 
     # Create environment used for evaluating checkpoints during training on simulation data.
@@ -252,7 +141,6 @@ def train(cfg: TrainPipelineConfig):
         logging.info("Creating env")
         eval_env = make_env(cfg.env, n_envs=cfg.eval.batch_size, use_async_envs=cfg.eval.use_async_envs)
 
-    # 开始
     logging.info("Creating policy")
     policy = make_policy(
         cfg=cfg.policy,
@@ -262,11 +150,9 @@ def train(cfg: TrainPipelineConfig):
     logging.info("Creating optimizer and scheduler")
     optimizer, lr_scheduler = make_optimizer_and_scheduler(cfg, policy)
     grad_scaler = GradScaler(device.type, enabled=cfg.policy.use_amp)
-    # 结束
 
     step = 0  # number of policy updates (forward + backward + optim)
 
-    # 开始
     if cfg.resume:
         step, optimizer, lr_scheduler = load_training_state(cfg.checkpoint_path, optimizer, lr_scheduler)
 
@@ -281,7 +167,6 @@ def train(cfg: TrainPipelineConfig):
     logging.info(f"{dataset.num_episodes=}")
     logging.info(f"{num_learnable_params=} ({format_big_number(num_learnable_params)})")
     logging.info(f"{num_total_params=} ({format_big_number(num_total_params)})")
-    # 结束
 
     if hasattr(cfg.policy, "drop_n_last_frames"):
         shuffle = False
@@ -303,34 +188,22 @@ def train(cfg: TrainPipelineConfig):
         pin_memory=device.type == "cuda",
         drop_last=False,
     )
-    #  构造 exclude list
-    exclude_features = []
-    if not cfg.use_depth_image:
-        exclude_features += ["observation.images.side_depth", "observation.images.side_depth_is_pad"]
-    if not cfg.use_force:
-        exclude_features += ["observation.force", "observation.force_is_pad"]
-    obj_detector = None
-
-    if cfg.use_language_tip or cfg.add_location_to_state:
-        from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
-        obj_detector = VisionProcessor()
 
 
 
 
 
-    # 包装 dataloader
-    dataloader = FilteredBatchLoader(raw_dataloader, exclude_features, obj_detector=obj_detector)
-
-    # 检查
-    # peek_batch = next(iter(dataloader))
-    # print("真正训练的时候甬道的feature：", list(peek_batch.keys()))
-    # print("task示例",peek_batch["task"][0])
-    # raise KeyError("输出检查")
+        # 检查
+    peek_batch = next(iter(raw_dataloader))
+    print("真正训练的时候甬道的feature：", list(peek_batch.keys()))
+    print("task示例",peek_batch["task"][0])
+    print("state示例",peek_batch["state"][0]))
+    raise KeyError("输出检查")
 
 
     # start train
-    dl_iter = cycle(dataloader)
+    dl_iter = cycle(raw_dataloader)
+
 
     policy.train()
 
