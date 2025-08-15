@@ -307,7 +307,12 @@ class VisionProcessor:
         return points_3d
 
     def count_distance(self, rgb_batch, depth_batch):
-        is_single = isinstance(rgb_batch, torch.Tensor) and rgb_batch.dim() == 3
+        is_single = (
+            (isinstance(rgb_batch, torch.Tensor) and rgb_batch.dim() == 3)
+            or
+            (isinstance(rgb_batch, np.ndarray) and rgb_batch.ndim == 3)
+        )
+
 
         if is_single:
             rgb_batch = [rgb_batch]
@@ -323,7 +328,7 @@ class VisionProcessor:
                                      (a[2] - b[2])**2)
                 distances.append(distance)
             else:
-                distances.append(None)
+                distances.append(0)
 
         return distances[0] if is_single else distances
 

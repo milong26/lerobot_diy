@@ -147,10 +147,10 @@ class RobotClientConfig:
     )
 
     # 默认的动作参数
-    high_distance_threshold: float = 1.0
-    low_distance_threshold: float = 0.5
-    high_distance_action_aggregate: int = 5
-    low_distance_action_aggregate: int = 3
+    high_distance_threshold: float = 0.2
+    low_distance_threshold: float = 0.1
+    high_distance_action_aggregate: int = 4
+    low_distance_action_aggregate: int = 2
 
     """
     个性化
