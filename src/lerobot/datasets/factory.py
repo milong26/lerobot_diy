@@ -87,6 +87,20 @@ def make_dataset(cfg: TrainPipelineConfig) -> LeRobotDataset | MultiLeRobotDatas
             cfg.dataset.repo_id, root=cfg.dataset.root, revision=cfg.dataset.revision
         )
         delta_timestamps = resolve_delta_timestamps(cfg.policy, ds_meta)
+
+
+        obj_detector = None
+        if cfg.language_tip_mode or cfg.add_location_to_state:
+            from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
+            obj_detector = VisionProcessor(cfg.language_tip_mode)
+
+        exclude_features = []
+        # if not cfg.use_depth_image:
+        # 目前训练默认不适用深度
+        exclude_features += ["observation.images.side_depth", "observation.images.side_depth_is_pad"]
+        # if not cfg.use_force:
+        #     exclude_features += ["observation.force", "observation.force_is_pad"]
+
         dataset = LeRobotDataset(
             cfg.dataset.repo_id,
             root=cfg.dataset.root,
@@ -95,10 +109,11 @@ def make_dataset(cfg: TrainPipelineConfig) -> LeRobotDataset | MultiLeRobotDatas
             image_transforms=image_transforms,
             revision=cfg.dataset.revision,
             video_backend=cfg.dataset.video_backend,
-            # 新增
-            use_true_depth=cfg.use_true_depth,
-            use_language_tip=cfg.use_language_tip,
-            language_tip_mode=cfg.language_tip_mode
+            # 新增以下4个
+            language_tip_mode=cfg.language_tip_mode,
+            add_location_to_state=cfg.add_location_to_state,
+            exclude_features=exclude_features,
+            obj_detector=obj_detector
         )
     else:
         raise NotImplementedError("The MultiLeRobotDataset isn't supported for now.")
