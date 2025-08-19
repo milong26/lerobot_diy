@@ -58,6 +58,9 @@ from lerobot.transport.utils import receive_bytes_in_chunks
 from pathlib import Path
 
 
+# 为了处理state
+
+
 
 class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
     prefix = "policy_server"
@@ -84,9 +87,9 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         self.actions_per_chunk = None
         self.policy = None
         
-        # 新增 处理task
-        self.modify_task=False # 这个应该可以不需要，直接判断objdetector是不是None就可以
-        self.obj_detector=None
+        # self.obj_detector=None
+        # 新增 统计推理次数
+        self.inference_count = 0
         
 
     @property
@@ -157,35 +160,33 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         self.policy.to(self.device)
         end = time.perf_counter()
 
-        # 根据模型的路径选择合适的modify_task策略（貌似也能，但是配置的可读性有点差，算了）
+        # 根据模型的路径选择合适的modify_task策略
         model_path = policy_specs.pretrained_name_or_path
         model_dirname = Path(model_path).parts  # or use Path(model_path).name for last part
+        model_name=exp_name = model_dirname[3] 
 
-        # 假设模型路径中有 "mtask_*"
-        if self.modify_task:
-        # 也可以改成直接判断lang_mode是否为None而决定要不要用modify_task
-            lang_mode = None
-            for part in model_dirname:
-                if part.startswith("mtask_"):
-                    lang_mode = part.split("mtask_")[1]
-                    break
-
-            if lang_mode is not None:
-                self.modify_task = True
-                self.language_tip_mode = lang_mode
-                print("采用的language是",lang_mode)
-                # 构造 obj_detector 实例并传入 mode
-                from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
-                self.obj_detector = VisionProcessor(mtask_mode=lang_mode)
-        else:
-            self.modify_task = False
-            self.obj_detector = None
-
-
-
-        # if self.modify_task:
-        #     from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
-        #     self.obj_detector = VisionProcessor(mtask_mode=mtask_mode)
+        # 处理三种模型：baseline，mtask，mstate
+        self.obj_detector = None
+        self.add_location_to_state = ""
+        self.language_tip_mode=""
+        # 在推理之前处理
+        if model_dirname.startswith("baseline"):
+            print("baseline模型，不做额外处理")
+        elif model_name.startswith("mtask_"):
+            # task 模式
+            lang_mode = model_name.split("mtask_")[1]  # 例如 relative / grid_2cm / grid_5cm
+            self.language_tip_mode = lang_mode
+            from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
+            self.obj_detector = VisionProcessor(language_tip_mode=lang_mode)
+            print(f"采用的 task 模式: {lang_mode}")
+        elif model_name.startswith("mstate_"):
+            # state 模式
+            state_mode = model_name.split("mstate_")[1]  # relative / 5cm
+            self.add_location_to_state = state_mode
+            from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
+            self.obj_detector = VisionProcessor()
+            print(f"采用的 state 模式: {state_mode}")
+            
 
         self.logger.info(f"Time taken to put policy on {self.device}: {end - start:.4f} seconds")
 
@@ -368,6 +369,28 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
         return observation
 
+    # 处理state的函数
+    def _add_location_to_state(self, item,unit_mter=1):
+        """从 item 中计算 gripper-object 相对坐标并拼接到 state"""
+        orig_state = item["observation.state"]
+        dx, dy, dz, flag = 0.0, 0.0, 0.0, 0.0
+        if self.obj_detector:
+            rgb = item["observation.images.side"]
+            depth = item.get("observation.images.side_depth", None)
+            points_3d = self.obj_detector.process_sample(rgb, depth)
+            if points_3d and len(points_3d) >= 2:
+                gripper_pos, object_pos = self.obj_detector.transform_camera_to_custom_coordsystem(points_3d)[:2]
+                if gripper_pos is not None and object_pos is not None:
+                    dx = round((object_pos[0] - gripper_pos[0])/unit_mter)
+                    dy = round((object_pos[1] - gripper_pos[1])/unit_mter)
+                    dz = round((object_pos[2] - gripper_pos[2])/unit_mter)
+                    flag = 1.0
+    
+        merged_state = torch.cat([orig_state, torch.tensor([[dx, dy, dz, flag]], dtype=orig_state.dtype)], dim=1)
+        item["observation.state"] = merged_state
+        return item
+    
+
     def _get_action_chunk(self, observation: dict[str, torch.Tensor]) -> torch.Tensor:
         """Get an action chunk from the policy. The chunk contains only"""
         chunk = self.policy.predict_action_chunk(observation)
@@ -387,17 +410,26 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
         self.last_processed_obs: TimedObservation = observation_t
 
-
+        # 推理之前，处理task和state
         # 处理obs中的task
-        if self.obj_detector is not None:
+        # 在visionprocessor已经用language_tip_mode进行初始化了
+        if self.language_tip_mode:
             task=observation["task"]
             colored_image=observation["observation.images.side"]
             depth_image=observation["observation.images.side_depth"]
             task_batch = [task]
             task=self.obj_detector.add_depth_info_to_task(colored_image,depth_image,task_batch)[0]
-            # 之前怎么没有加这一句
             observation["task"]=task
-        print("目前的task内容：",observation["task"])
+        self.logger.info(f"推理目前的task内容：{observation["task"]}")
+        # 处理obs中的state
+        if self.add_location_to_state:
+            if self.add_location_to_state=="pure":
+                observation = self._add_location_to_state(observation)
+            elif self.add_location_to_state=="grid_5cm":
+                observation =self._add_location_to_state(observation,unit_mter=0.05)
+        self.logger.info(f"推理目前的state内容：{observation["observation.state"]}")
+
+
 
         """2. Get action chunk"""
         start_time = time.perf_counter()
@@ -414,6 +446,10 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         )
         postprocessing_time = time.perf_counter() - start_time
         inference_stops = time.perf_counter()
+
+        # 输出总共的推理次数
+        self.inference_count += 1
+        self.logger.info(f"Total inference calls so far: {self.inference_count}")
 
         # self.logger.info(
         #     f"Observation {observation_t.get_timestep()} |"

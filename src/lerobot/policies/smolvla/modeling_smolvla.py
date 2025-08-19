@@ -456,8 +456,6 @@ class SmolVLAPolicy(PreTrainedPolicy):
         else:
         # 服务器就注释掉上面一行，使用下面四行。
 
-        
-            # 0731临时修改
 
             images, img_masks = self.prepare_images(batch_dict)
             state = self.prepare_state(batch_dict)
@@ -478,7 +476,18 @@ class SmolVLAPolicy(PreTrainedPolicy):
     def _prepare_batch(self, batch: dict[str, Tensor]) -> dict[str, Tensor]:
         if self.config.adapt_to_pi_aloha:
             batch[OBS_STATE] = self._pi_aloha_decode_state(batch[OBS_STATE])
-        # 我怎么感觉这里也要处理？推理的时候
+        # # 推理之前也要处理normalize的，对于state的
+        # # 确保add_location_to_state有且add_state_dim对应
+        # if self.add_location_to_state:
+        #     adding_state_stat = {
+        #         "min": torch.tensor(self.add_state_dim["min"], dtype=torch.float32),
+        #         "max": torch.tensor(self.add_state_dim["max"], dtype=torch.float32),
+        #         "mean": torch.tensor(self.add_state_dim["mean"], dtype=torch.float32),
+        #         "std": torch.tensor(self.add_state_dim["std"], dtype=torch.float32),
+        #     }
+        # else:
+        #     adding_state_stat=None
+        # batch = self.normalize_inputs(batch,adding_state_stat)
         batch = self.normalize_inputs(batch)
 
         return batch
@@ -651,8 +660,6 @@ class SmolVLAPolicy(PreTrainedPolicy):
             tasks = [tasks[0] for _ in range(batch[OBS_STATE].shape[0])]
 
         tasks = [task if task.endswith("\n") else f"{task}\n" for task in tasks]
-
-
 
         # 以前是不加的，直到用了language，添加了一些语言
         """
