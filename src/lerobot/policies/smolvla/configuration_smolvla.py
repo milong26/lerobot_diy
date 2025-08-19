@@ -86,6 +86,7 @@ class SmolVLAConfig(PreTrainedConfig):
     # 直接把这个vlm_model_name改成local
     vlm_model_name: str = "models/forsmolvla/HuggingFaceTB/SmolVLM2-500M-Video-Instruct"
     # 外部通知要不要加dim
+    # 训练和推理的时候都要用到
     add_location_to_state: str=""
 
 
