@@ -420,14 +420,14 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             task_batch = [task]
             task=self.obj_detector.add_depth_info_to_task(colored_image,depth_image,task_batch)[0]
             observation["task"]=task
-        self.logger.info(f"推理目前的task内容：{observation["task"]}")
+        self.logger.info(f'推理目前的task内容：{observation["task"]}')
         # 处理obs中的state
         if self.add_location_to_state:
             if self.add_location_to_state=="pure":
                 observation = self._add_location_to_state(observation)
             elif self.add_location_to_state=="grid_5cm":
                 observation =self._add_location_to_state(observation,unit_mter=0.05)
-        self.logger.info(f"推理目前的state内容：{observation["observation.state"]}")
+        self.logger.info(f'推理目前的state内容：{observation["observation.state"]}')
 
 
 
