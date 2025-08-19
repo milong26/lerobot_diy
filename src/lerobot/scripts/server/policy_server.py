@@ -429,6 +429,9 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
                 observation =self._add_location_to_state(observation,unit_mter=0.05)
         self.logger.info(f'推理目前的state内容：{observation["observation.state"]}')
 
+        # 去掉多余的side_depth
+        observation.pop("observation.images.side_depth", None)
+
 
 
         """2. Get action chunk"""
