@@ -75,6 +75,7 @@ from lerobot.policies.utils import (
     populate_queues,
 )
 from lerobot.utils.utils import get_safe_dtype
+from simplify_work.tools.calculate_state_for_norm import compute_last4_stats
 
 
 IS_LOCAL = os.environ.get("ENV", "") == "local"
@@ -180,6 +181,22 @@ def load_smolvla(
     state_dict = {k: v for k, v in state_dict.items() if not k.startswith(norm_keys)}
 
     missing, unexpected = model.load_state_dict(state_dict, strict=False)
+     # 🔑 处理 state 维度扩展
+    if model.add_location_to_state:
+        with torch.no_grad():
+            old_dim = 6  # 你原来的预训练模型输入维度
+            new_dim = 10
+            if "model.state_proj.weight" in state_dict:         # shape [hidden, 10]
+                model.model.state_proj.weight[:, old_dim:new_dim] = torch.empty(
+                        model.model.state_proj.weight[:, old_dim:new_dim].shape
+                    )
+                nn.init.xavier_uniform_(model.model.state_proj.weight[:, old_dim:new_dim])
+
+            # bias 可以清零或者保持原值
+            if model.model.state_proj.bias is not None:
+                model.model.state_proj.bias[old_dim:new_dim].zero_()
+            print(f"初始化 state_proj 新增维度: {old_dim} -> {new_dim}")
+                
 
     if not all(key.startswith(norm_keys) for key in missing) or unexpected:
         raise RuntimeError(
@@ -188,15 +205,6 @@ def load_smolvla(
             len(missing),
             len(unexpected),
         )
-    # 还没改完，加state
-    # with torch.no_grad():
-    #     input_dim = model.model.state_proj.weight.shape[1]
-    #     # 原来 state 是 6 维，现在是 10 维，所以新增了 4 个维度
-    #     last_new_idx = list(range(6, 10))
-    #     nn.init.xavier_uniform_(model.model.state_proj.weight[:, last_new_idx])
-    #     if model.model.state_proj.bias is not None:
-    #         model.model.state_proj.bias.zero_()
-    #         print("重置了state的6-9维的权重")
 
     return model
 
@@ -382,19 +390,13 @@ class SmolVLAPolicy(PreTrainedPolicy):
         self.language_tokenizer = AutoProcessor.from_pretrained(self.config.vlm_model_name, local_files_only=True).tokenizer
     
         self.model = VLAFlowMatching(config)
+        self.add_location_to_state=config.add_location_to_state
+        # 加载
+        if self.add_location_to_state:
+            self.add_state_dim=compute_last4_stats(self.add_location_to_state)
+        else:
+            self.add_state_dim=None
         self.reset()
-        # 为了能more step
-        # self._warmup_steps = 5  # 或从 config 中读取，可改
-        self._in_warmup = False
-        # if self._in_warmup:
-        #     from simplify_work.obj_dection.detector_api import GroundingDINOProcessor
-        #     self.obj_detector = GroundingDINOProcessor(
-        #         text_prompt="The Gripper And The Pyramid-Shaped Sachet",
-        #         device="cpu",
-        #     )
-        #     print("objmodel创建")
-        # else: 
-        #     self.obj_detector=None
 
 
     # 新建action queue
@@ -476,7 +478,7 @@ class SmolVLAPolicy(PreTrainedPolicy):
     def _prepare_batch(self, batch: dict[str, Tensor]) -> dict[str, Tensor]:
         if self.config.adapt_to_pi_aloha:
             batch[OBS_STATE] = self._pi_aloha_decode_state(batch[OBS_STATE])
-
+        # 我怎么感觉这里也要处理？推理的时候
         batch = self.normalize_inputs(batch)
 
         return batch
@@ -560,7 +562,17 @@ class SmolVLAPolicy(PreTrainedPolicy):
         if self.config.adapt_to_pi_aloha:
             batch[OBS_STATE] = self._pi_aloha_decode_state(batch[OBS_STATE])
             batch[ACTION] = self._pi_aloha_encode_actions_inv(batch[ACTION])
-        batch = self.normalize_inputs(batch)
+        # 提前处理if 增加了state
+        if self.add_location_to_state:
+            adding_state_stat = {
+                "min": torch.tensor(self.add_state_dim["min"], dtype=torch.float32),
+                "max": torch.tensor(self.add_state_dim["max"], dtype=torch.float32),
+                "mean": torch.tensor(self.add_state_dim["mean"], dtype=torch.float32),
+                "std": torch.tensor(self.add_state_dim["std"], dtype=torch.float32),
+            }
+        else:
+            adding_state_stat=None
+        batch = self.normalize_inputs(batch,adding_state_stat)
         batch = self.normalize_targets(batch)
         images, img_masks = self.prepare_images(batch)
         state = self.prepare_state(batch)

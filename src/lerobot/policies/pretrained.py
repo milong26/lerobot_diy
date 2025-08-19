@@ -106,6 +106,7 @@ class PreTrainedPolicy(nn.Module, HubMixin, abc.ABC):
             model_file = os.path.join(model_id, SAFETENSORS_SINGLE_FILE)
             policy = cls._load_as_safetensor(instance, model_file, config.device, strict)
         else:
+            raise FileNotFoundError("pretrainedpolicy这里的from_pretrained报错，model_path没写对")
             try:
                 model_file = hf_hub_download(
                     repo_id=model_id,

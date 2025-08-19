@@ -80,7 +80,6 @@ def update_policy(
 
     # Unscale the gradient of the optimizer's assigned params in-place **prior to gradient clipping**.
     grad_scaler.unscale_(optimizer)
-
     grad_norm = torch.nn.utils.clip_grad_norm_(
         policy.parameters(),
         grad_clip_norm,
@@ -145,6 +144,8 @@ def train(cfg: TrainPipelineConfig):
     policy = make_policy(
         cfg=cfg.policy,
         ds_meta=dataset.meta,
+        # 传入add_location_to_state
+        add_location_to_state=cfg.add_location_to_state
     )
 
     logging.info("Creating optimizer and scheduler")
@@ -207,6 +208,7 @@ def train(cfg: TrainPipelineConfig):
 
     policy.train()
 
+
     train_metrics = {
         "loss": AverageMeter("loss", ":.3f"),
         "grad_norm": AverageMeter("grdn", ":.3f"),
@@ -228,7 +230,6 @@ def train(cfg: TrainPipelineConfig):
         for key in batch:
             if isinstance(batch[key], torch.Tensor):
                 batch[key] = batch[key].to(device, non_blocking=device.type == "cuda")
-        # print("task示例",batch["task"])
 
         train_tracker, output_dict = update_policy(
             train_tracker,

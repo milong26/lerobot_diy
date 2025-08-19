@@ -63,7 +63,7 @@ def handle_data_connection(conn, model):
             # model.reset() 
             images = wait_for_images(['side', 'side_depth','wrist'], timeout=2.0)
             if images is None:
-                raise KeyError("图片没传送过来")
+                raise ValueError("图片没传送过来")
             else:
                 for cam, np_img in images.items():
                     key = f'observation.images.{cam}'
