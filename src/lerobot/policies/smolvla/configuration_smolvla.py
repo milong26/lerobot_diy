@@ -85,6 +85,8 @@ class SmolVLAConfig(PreTrainedConfig):
     # vlm_model_name: str = "HuggingFaceTB/SmolVLM2-500M-Video-Instruct"  # Select the VLM backbone.
     # 直接把这个vlm_model_name改成local
     vlm_model_name: str = "models/forsmolvla/HuggingFaceTB/SmolVLM2-500M-Video-Instruct"
+    # 外部通知要不要加dim
+    add_location_to_state: str=""
 
 
     # 不方便直接下载所以改成path

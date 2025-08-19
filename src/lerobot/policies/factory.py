@@ -34,6 +34,7 @@ from lerobot.policies.sac.reward_model.configuration_classifier import RewardCla
 from lerobot.policies.smolvla.configuration_smolvla import SmolVLAConfig
 from lerobot.policies.tdmpc.configuration_tdmpc import TDMPCConfig
 from lerobot.policies.vqbet.configuration_vqbet import VQBeTConfig
+import copy
 
 
 def get_policy_class(name: str) -> PreTrainedPolicy:
@@ -101,10 +102,28 @@ def make_policy_config(policy_type: str, **kwargs) -> PreTrainedConfig:
         raise ValueError(f"Policy type '{policy_type}' is not available.")
 
 
+def filter_meta_for_policy(ds_meta, exclude_features=None, state_dim=None):
+    """根据需求过滤掉 ds_meta 里的 features 并调整 state 维度"""
+    meta = copy.deepcopy(ds_meta)  # 不改 dataset 的原始 meta
+
+    if exclude_features is None:
+        exclude_features = []
+
+    # 删除不需要的 feature
+    for feat in exclude_features:
+        if feat in meta.features:
+            meta.features.pop(feat)
+
+    # 修改 state 维度
+    if state_dim is not None and "observation.state" in meta.features:
+        meta.features["observation.state"]["shape"] = (state_dim,)
+    return meta
+
 def make_policy(
     cfg: PreTrainedConfig,
     ds_meta: LeRobotDatasetMetadata | None = None,
     env_cfg: EnvConfig | None = None,
+    add_location_to_state:  str = ""
 ) -> PreTrainedPolicy:
     """Make an instance of a policy class.
 
@@ -145,9 +164,23 @@ def make_policy(
     policy_cls = get_policy_class(cfg.type)
 
     kwargs = {}
+    cfg.add_location_to_state=add_location_to_state
     if ds_meta is not None:
-        features = dataset_to_policy_features(ds_meta.features)
-        kwargs["dataset_stats"] = ds_meta.stats
+         # 🔑 过滤 meta
+        exclude_features = [
+            "observation.images.side_depth",
+            "observation.images.side_depth_is_pad",
+            "observation.force",
+            "observation.force_is_pad",
+        ]
+        # state_dim 可以从 cfg 控制，要不要改成 10 维
+        meta_for_policy = filter_meta_for_policy(
+            ds_meta,
+            exclude_features=exclude_features,
+            state_dim=(10 if add_location_to_state else None)
+        )
+        features = dataset_to_policy_features(meta_for_policy.features)
+        kwargs["dataset_stats"] = meta_for_policy.stats
     else:
         if not cfg.pretrained_path:
             logging.warning(

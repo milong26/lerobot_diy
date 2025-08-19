@@ -170,7 +170,7 @@ class PreTrainedConfig(draccus.ChoiceRegistry, HubMixin, abc.ABC):
             else:
                 print(f"{CONFIG_NAME} not found in {Path(model_id).resolve()}")
         else:
-            raise KeyError("本地没有模型文件:",model_id)
+            raise FileNotFoundError("本地没有模型文件:",model_id)
             try:
                 config_file = hf_hub_download(
                     repo_id=model_id,

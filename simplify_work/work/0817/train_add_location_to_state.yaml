@@ -8,9 +8,9 @@ dataset:
   root: training_dataset/0803_with_red/pickplace/first100
 
 batch_size: 64
-steps: 22000
-output_dir: outputs/train/test/test
-job_name: training_test
+steps: 30000
+output_dir: outputs/train/0817/add_state_1
+job_name: add_state
 wandb:
   enable: false
 

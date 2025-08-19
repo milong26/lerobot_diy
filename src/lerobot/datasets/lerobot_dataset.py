@@ -73,6 +73,8 @@ from lerobot.datasets.video_utils import (
     get_video_info,
 )
 import torchvision.transforms.functional as TF
+
+from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
 CODEBASE_VERSION = "v2.1"
 
 class LeRobotDatasetMetadata:
@@ -326,6 +328,7 @@ class LeRobotDatasetMetadata:
         obj.revision = None
         return obj
 
+
 def load_modified_tasks(path):
     """从 JSONL 文件中加载修改后的任务，返回 nested dict[ep_idx][frame_idx] = task"""
     from collections import defaultdict
@@ -356,9 +359,9 @@ class LeRobotDataset(torch.utils.data.Dataset):
         batch_encoding_size: int = 1,
         # 下面是为了train的自定义内容
         language_tip_mode: str="", # 当空的时候就等于baseline
-        add_location_to_state: bool = False,   # 控制是将location加到state里面
+        add_location_to_state: str = "",   # 控制是将location加到state里面 改成字符串
         exclude_features: list[str] = None,    # 控制需要过滤的 key，最终的训练（主要是为了过滤掉depth）
-        obj_detector=None,                     # 可选的目标检测器，为了state加的
+        obj_detector: VisionProcessor=None,                     # 可选的目标检测器，为了state加的
     ):
         """
         2 modes are available for instantiating this class, depending on 2 different use cases:
@@ -541,7 +544,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
 
     # 先按照6+4拼接，返回state
     # 这个过程需要在获得state之后,filter之前
-    def _add_location_to_state(self, item):
+    def _add_location_to_state(self, item,unit_mter=1):
         """从 item 中计算 gripper-object 相对坐标并拼接到 state"""
         orig_state = item["observation.state"]
         dx, dy, dz, flag = 0.0, 0.0, 0.0, 0.0
@@ -552,9 +555,9 @@ class LeRobotDataset(torch.utils.data.Dataset):
             if points_3d and len(points_3d) >= 2:
                 gripper_pos, object_pos = self.obj_detector.transform_camera_to_custom_coordsystem(points_3d)[:2]
                 if gripper_pos is not None and object_pos is not None:
-                    dx = object_pos[0] - gripper_pos[0]
-                    dy = object_pos[1] - gripper_pos[1]
-                    dz = object_pos[2] - gripper_pos[2]
+                    dx = round((object_pos[0] - gripper_pos[0])/unit_mter)
+                    dy = round((object_pos[1] - gripper_pos[1])/unit_mter)
+                    dz = round((object_pos[2] - gripper_pos[2])/unit_mter)
                     flag = 1.0
     
         merged_state = torch.cat([orig_state, torch.tensor([[dx, dy, dz, flag]], dtype=orig_state.dtype)], dim=1)
@@ -855,7 +858,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         if self.language_tip_mode and self.modified_tasks:
             # 从本地读取
             if not len(frame_idx) == 1:
-                raise KeyError("一次getitem应该只获取一个")
+                raise ValueError("一次getitem应该只获取一个")
             frame_idx=frame_idx[0]
             if hasattr(self, "modified_tasks") and ep_idx in self.modified_tasks and frame_idx in self.modified_tasks[ep_idx]:
             # if ep_idx in self.modified_tasks and frame_idx in self.modified_tasks[ep_idx]:
@@ -867,14 +870,21 @@ class LeRobotDataset(torch.utils.data.Dataset):
         # 平常的task
             task_idx = item["task_index"].item()
             item["task"] = self.meta.tasks[task_idx]
-
-        # add_location_to_state
+                # add_location_to_state
         if self.add_location_to_state:
-            item = self._add_location_to_state(item)
+            if self.add_location_to_state=="pure":
+                item = self._add_location_to_state(item)
+            elif self.add_location_to_state=="grid_5cm":
+                item =self._add_location_to_state(item,unit_mter=0.05)
+            else:
+                raise AttributeError("设置了别的add_location_to_state方式")
+        
         # 过滤无用 key
         if self.exclude_features:
             item = {k: v for k, v in item.items() if k not in self.exclude_features}
         
+
+
         return item
 
     def __repr__(self):

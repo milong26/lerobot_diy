@@ -65,7 +65,8 @@ class TrainPipelineConfig(HubMixin):
     wandb: WandBConfig = field(default_factory=WandBConfig)
     # 自定义
     language_tip_mode: str="", # 当空的时候就等于baseline   
-    add_location_to_state: bool = False,   # 控制是将location加到state里面
+    # 改成模式，有 pure和grid
+    add_location_to_state: str = "",   # 控制是将location加到state里面
 
     def __post_init__(self):
         self.checkpoint_path = None

@@ -18,7 +18,7 @@ depth_scale = 0.0010000000474974513
 
 
 class VisionProcessor:
-    def __init__(self,mtask_mode=""):
+    def __init__(self,language_tip_mode=""):
         self.fail_counter = 0
 
         # 红色识别 (夹子)
@@ -37,7 +37,7 @@ class VisionProcessor:
         self.object_detected = 0
 
         # task处理的mode
-        self.mtask_mode=mtask_mode
+        self.language_tip_mode=language_tip_mode
 
     def _transform_image(self, image_tensor):
         if isinstance(image_tensor, torch.Tensor):
@@ -184,7 +184,7 @@ class VisionProcessor:
                 gripper_pos = converted_3d[0]
                 object_pos = converted_3d[1]
 
-                if self.mtask_mode == "relative":
+                if self.language_tip_mode == "relative":
                     # 只有当两个点都存在，才计算相对坐标
                     if gripper_pos is not None and object_pos is not None:
                         dx = object_pos[0] - gripper_pos[0]
@@ -196,7 +196,7 @@ class VisionProcessor:
                         # 缺失任何一个，返回原始任务
                         task_str = task
 
-                elif self.mtask_mode == "relative_grid":
+                elif self.language_tip_mode == "relative_grid_5cm":
                     if gripper_pos is not None and object_pos is not None:
                         dx = object_pos[0] - gripper_pos[0]
                         dy = object_pos[1] - gripper_pos[1]
@@ -210,9 +210,9 @@ class VisionProcessor:
                     else:
                         task_str = task
                 # 结构化prompt需要修改
-                elif self.mtask_mode == "structural":
+                elif self.language_tip_mode == "structural":
                     pass
-                elif self.mtask_mode == "relative_grid_1cm":
+                elif self.language_tip_mode == "relative_grid_1cm":
                     if gripper_pos is not None and object_pos is not None:
                         dx = object_pos[0] - gripper_pos[0]
                         dy = object_pos[1] - gripper_pos[1]
@@ -225,7 +225,7 @@ class VisionProcessor:
                                     f"({dx_grid}, {dy_grid}, {dz_grid}) in 1cm grid units.")
                     else:
                         task_str = task
-                elif self.mtask_mode == "relative_grid_2cm":
+                elif self.language_tip_mode == "relative_grid_2cm":
                     if gripper_pos is not None and object_pos is not None:
                         dx = object_pos[0] - gripper_pos[0]
                         dy = object_pos[1] - gripper_pos[1]
@@ -336,10 +336,9 @@ class VisionProcessor:
         if self.total_images == 0:
             print("尚未处理任何图像。")
             return
-
-        gripper_rate = self.gripper_detected / self.total_images * 100
-        object_rate = self.object_detected / self.total_images * 100
-
-        print(f"总图像数: {self.total_images}")
-        print(f"Gripper 检测成功率: {gripper_rate:.2f}% ({self.gripper_detected}/{self.total_images})")
-        print(f"Object 检测成功率: {object_rate:.2f}% ({self.object_detected}/{self.total_images})")
+        if self.total_images % 1000 == 0:
+            gripper_rate = self.gripper_detected / self.total_images * 100
+            object_rate = self.object_detected / self.total_images * 100
+            print(f"总图像数: {self.total_images}")
+            print(f"Gripper 检测成功率: {gripper_rate:.2f}% ({self.gripper_detected}/{self.total_images})")
+            print(f"Object 检测成功率: {object_rate:.2f}% ({self.object_detected}/{self.total_images})")
