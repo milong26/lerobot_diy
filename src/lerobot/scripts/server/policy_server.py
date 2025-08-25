@@ -181,7 +181,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             print(f"采用的 task 模式: {lang_mode}")
         elif model_name.startswith("mstate_"):
             # state 模式
-            state_mode = model_name.split("mstate_")[1]  # relative / 5cm
+            state_mode = model_name.split("mstate_")[1]  # pure / 5cm
             self.add_location_to_state = state_mode
             from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
             self.obj_detector = VisionProcessor()
@@ -262,8 +262,6 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
             start_time = time.perf_counter()
             actions_bytes = pickle.dumps(action_chunk)  # nosec
-            # 打包actionchunk+distance
-            # actions_bytes = pickle.dumps((action_chunk, distance))  # nosec
             serialize_time = time.perf_counter() - start_time
 
             # Create and return the action chunk
@@ -447,8 +445,6 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
         # 去掉多余的side_depth
         observation.pop("observation.images.side_depth", None)
-
-
 
         """2. Get action chunk"""
         start_time = time.perf_counter()

@@ -152,6 +152,8 @@ class RobotClientConfig:
     high_distance_action_aggregate: int = 4
     low_distance_action_aggregate: int = 2
 
+    use_skip_step: bool=False
+
 
     @property
     def environment_dt(self) -> float:
