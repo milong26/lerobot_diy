@@ -37,6 +37,7 @@ import draccus
 import grpc
 import torch
 
+from lerobot.configs.types import FeatureType, PolicyFeature
 from lerobot.policies.factory import get_policy_class
 from lerobot.scripts.server.configs import PolicyServerConfig
 from lerobot.scripts.server.constants import SUPPORTED_POLICIES
@@ -148,10 +149,9 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
         self.device = policy_specs.device
         self.policy_type = policy_specs.policy_type  # act, pi0, etc.
-        self.lerobot_features = policy_specs.lerobot_features
+        self.lerobot_features = policy_specs.lerobot_features 
+        # 应该是包含'observation.images.side_depth'
         self.actions_per_chunk = policy_specs.actions_per_chunk
-        # 增加modifiedtask开关
-        self.modify_task=policy_specs.modify_task
 
         policy_class = get_policy_class(self.policy_type)
 
@@ -163,14 +163,14 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         # 根据模型的路径选择合适的modify_task策略
         model_path = policy_specs.pretrained_name_or_path
         model_dirname = Path(model_path).parts  # or use Path(model_path).name for last part
-        model_name=exp_name = model_dirname[3] 
+        model_name=exp_name = str(model_dirname[3])
 
         # 处理三种模型：baseline，mtask，mstate
         self.obj_detector = None
         self.add_location_to_state = ""
         self.language_tip_mode=""
         # 在推理之前处理
-        if model_dirname.startswith("baseline"):
+        if model_name.startswith("baseline"):
             print("baseline模型，不做额外处理")
         elif model_name.startswith("mtask_"):
             # task 模式
@@ -186,7 +186,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
             self.obj_detector = VisionProcessor()
             print(f"采用的 state 模式: {state_mode}")
-            
+
 
         self.logger.info(f"Time taken to put policy on {self.device}: {end - start:.4f} seconds")
 
@@ -253,9 +253,8 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
             with self._predicted_timesteps_lock:
                 self._predicted_timesteps.add(obs.get_timestep())
-            
 
-            
+
 
             start_time = time.perf_counter()
             action_chunk = self._predict_action_chunk(obs)
@@ -359,14 +358,25 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         client and then convert them to float32 [0,1] images here, before running inference.
         """
         # RawObservation from robot.get_observation() - wrong keys, wrong dtype, wrong image shape
+        # 如果需要用depth，self.policy_image_features里面就要加
+
+        # 新增 side_depth 的 PolicyFeature
+        side_depth_feature = {
+            "observation.images.side_depth": PolicyFeature(
+                type=FeatureType.VISUAL,
+                shape=(3, 480, 640)
+            )
+        }
+        # 合并原来的 policy_image_features 和新增 feature
+        changed_policy_image_features = {**self.policy_image_features, **side_depth_feature}
         observation: Observation = raw_observation_to_observation(
             observation_t.get_observation(),
             self.lerobot_features,
-            self.policy_image_features,
+            # self.policy_image_features,
+            changed_policy_image_features,
             self.device,
         )
         # processed Observation - right keys, right dtype, right image shape
-
         return observation
 
     # 处理state的函数
@@ -381,12 +391,18 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             if points_3d and len(points_3d) >= 2:
                 gripper_pos, object_pos = self.obj_detector.transform_camera_to_custom_coordsystem(points_3d)[:2]
                 if gripper_pos is not None and object_pos is not None:
-                    dx = round((object_pos[0] - gripper_pos[0])/unit_mter)
-                    dy = round((object_pos[1] - gripper_pos[1])/unit_mter)
-                    dz = round((object_pos[2] - gripper_pos[2])/unit_mter)
-                    flag = 1.0
+                    if unit_mter==1:
+                        dx = object_pos[0] - gripper_pos[0]
+                        dy = object_pos[1] - gripper_pos[1]
+                        dz = object_pos[2] - gripper_pos[2]
+                        flag = 1.0
+                    else:
+                        dx = round((object_pos[0] - gripper_pos[0])/unit_mter)
+                        dy = round((object_pos[1] - gripper_pos[1])/unit_mter)
+                        dz = round((object_pos[2] - gripper_pos[2])/unit_mter)
+                        flag = 1.0
     
-        merged_state = torch.cat([orig_state, torch.tensor([[dx, dy, dz, flag]], dtype=orig_state.dtype)], dim=1)
+        merged_state = torch.cat([orig_state, torch.tensor([[dx, dy, dz, flag]], dtype=orig_state.dtype).to(self.device)], dim=1)
         item["observation.state"] = merged_state
         return item
     

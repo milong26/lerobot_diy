@@ -40,6 +40,9 @@ class VisionProcessor:
         self.language_tip_mode=language_tip_mode
 
     def _transform_image(self, image_tensor):
+        if isinstance(image_tensor, torch.Tensor) and image_tensor.ndim == 4:
+        # [B, C, H, W] -> [C, H, W]
+            image_tensor = image_tensor[0]
         if isinstance(image_tensor, torch.Tensor):
             image_np = (image_tensor.permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
         elif isinstance(image_tensor, np.ndarray):
@@ -188,6 +191,7 @@ class VisionProcessor:
                 1. relative
                 2. grid_2cm
                 3. grid_5cm
+                4. grid_3cm没写好
                 """
                 
 
@@ -247,6 +251,7 @@ class VisionProcessor:
                         else:
                             task_str = task
                     else:
+                        raise ValueError(f"language_tip_mode写成{self.language_tip_mode}")
                         # 这个版本应该没用了，最多拿来计算
                         gripper_str = (
                             f"({gripper_pos[0]:.3f}, {gripper_pos[1]:.3f}, {gripper_pos[2]:.3f})"

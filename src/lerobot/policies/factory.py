@@ -16,7 +16,9 @@
 
 import logging
 
+import numpy as np
 from torch import nn
+import torch
 
 from lerobot.configs.policies import PreTrainedConfig
 from lerobot.configs.types import FeatureType
@@ -35,6 +37,8 @@ from lerobot.policies.smolvla.configuration_smolvla import SmolVLAConfig
 from lerobot.policies.tdmpc.configuration_tdmpc import TDMPCConfig
 from lerobot.policies.vqbet.configuration_vqbet import VQBeTConfig
 import copy
+
+from simplify_work.tools.calculate_state_for_norm import compute_last4_stats
 
 
 def get_policy_class(name: str) -> PreTrainedPolicy:
@@ -102,7 +106,7 @@ def make_policy_config(policy_type: str, **kwargs) -> PreTrainedConfig:
         raise ValueError(f"Policy type '{policy_type}' is not available.")
 
 
-def filter_meta_for_policy(ds_meta, exclude_features=None, state_dim=None):
+def filter_meta_for_policy(ds_meta, exclude_features=None, state_dim=""):
     """根据需求过滤掉 ds_meta 里的 features 并调整 state 维度"""
     meta = copy.deepcopy(ds_meta)  # 不改 dataset 的原始 meta
 
@@ -115,8 +119,23 @@ def filter_meta_for_policy(ds_meta, exclude_features=None, state_dim=None):
             meta.features.pop(feat)
 
     # 修改 state 维度
-    if state_dim is not None and "observation.state" in meta.features:
-        meta.features["observation.state"]["shape"] = (state_dim,)
+    if state_dim and "observation.state" in meta.features:
+        meta.features["observation.state"]["shape"] = (10,)
+
+    # 更新dataset_stats
+    if state_dim: # pure
+        old_stats = meta.stats["observation.state"]
+        lasts_stats=compute_last4_stats(adding_mode=state_dim)
+        new_stats = {}
+        for k in ["min", "max", "mean", "std"]:
+            old = old_stats[k]
+            new = np.array(lasts_stats[k])  # 后4维
+            merged = np.concatenate([old, new], axis=0)  # 拼接成10维
+            new_stats[k] = torch.tensor(merged, dtype=torch.float32)
+
+        # new_stats["count"] = old_stats["count"]  # count 不变
+        meta.stats["observation.state"] = new_stats
+
     return meta
 
 def make_policy(
@@ -166,18 +185,17 @@ def make_policy(
     kwargs = {}
     cfg.add_location_to_state=add_location_to_state
     if ds_meta is not None:
-         # 🔑 过滤 meta
         exclude_features = [
             "observation.images.side_depth",
             "observation.images.side_depth_is_pad",
             "observation.force",
             "observation.force_is_pad",
         ]
-        # state_dim 可以从 cfg 控制，要不要改成 10 维
+        # state_dim改成10维
         meta_for_policy = filter_meta_for_policy(
             ds_meta,
             exclude_features=exclude_features,
-            state_dim=(10 if add_location_to_state else None)
+            state_dim=add_location_to_state
         )
         features = dataset_to_policy_features(meta_for_policy.features)
         kwargs["dataset_stats"] = meta_for_policy.stats

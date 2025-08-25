@@ -8,9 +8,9 @@ dataset:
   root: training_dataset/0803_with_red/pickplace/first100
 
 batch_size: 64
-steps: 10000
-output_dir: outputs/train/0817/mstate_check_state_proj
-job_name: add_state
+steps: 30000
+output_dir: outputs/train/0822/grid_3cm
+job_name: 3cm
 wandb:
   enable: false
 
@@ -24,6 +24,6 @@ policy:
 
 # 当空的时候就等于baseline
 # 会找数据集里面f"mtask_{self.language_tip_mode}.jsonl"的文件
-language_tip_mode: "" 
+language_tip_mode: "relative_grid_3cm" 
 # 控制是将location加到state里面
-add_location_to_state:  "pure"
+add_location_to_state:  ""
