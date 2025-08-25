@@ -144,13 +144,14 @@ class RobotClient:
         # Use an event for thread-safe coordination
         self.must_go = threading.Event()
         self.must_go.set()  # Initially set - observations qualify for direct processing
-        # 距离
-        self.latest_distance = 0 
-        
+        self.latest_distance = 0 # 本地计算出距离
+        # 初始化一个_detector?
         self.obj_detector = VisionProcessor()
         # 监听键盘输入->的时候清空action缓存
         threading.Thread(target=self._listen_clear_key,daemon=True).start()
+        # 等待时间
         self.pause_until=0
+        self.use_skip_step=config.use_skip_step
 
 
     def _listen_clear_key(self):
@@ -158,6 +159,8 @@ class RobotClient:
             try:
                 if key==keyboard.Key.right:
                     self.clear_action_queue()
+                if key==keyboard.Key.left:
+                    self.running=False
             except AttributeError:
                 self.logger.info("键盘出问题")
         with keyboard.Listener(on_press=on_press) as listener:
@@ -173,7 +176,6 @@ class RobotClient:
         self.logger.info("清空了actionqueue，顺便设置了mustgo，停个几秒")
         # 要设置control_loop里面暂停
         self.pause_until=time.time()+pause_seconds
-        # time.sleep(pause_seconds)
 
     @property
     def running(self):
@@ -201,7 +203,6 @@ class RobotClient:
             )
 
             self.stub.SendPolicyInstructions(policy_setup)
-            print("start发送完模型config了")
 
             self.shutdown_event.clear()
 
@@ -263,7 +264,7 @@ class RobotClient:
         return queue_size, timestamps
     
 
-    # 服务器传来的action怎么放到action queue，解决冲突？
+    # 服务器传来的action怎么放到action queue
     def _aggregate_action_queues(
         self,
         incoming_actions: list[TimedAction],
@@ -415,7 +416,9 @@ class RobotClient:
             num_actions = self.config.low_distance_action_aggregate  # e.g. 3
         else:
             num_actions = 1
-        num_actions=1
+        # 要开启快慢吗？
+        if  not self.use_skip_step:
+            num_actions=1
         # Lock only for queue operations
         get_start = time.perf_counter()
 
@@ -450,6 +453,7 @@ class RobotClient:
         get_end = time.perf_counter() - get_start
 
         # 给robot实际运行的action指令
+        # 检查action是不是有点诡异
         _performed_action = self.robot.send_action(
             self._action_tensor_to_action_dict(averaged_action.get_action())
         )
