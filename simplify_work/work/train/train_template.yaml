@@ -26,4 +26,4 @@ policy:
 # 会找数据集里面f"mtask_{self.language_tip_mode}.jsonl"的文件
 language_tip_mode: "" 
 # 控制是将location加到state里面
-add_location_to_state:  true
+add_location_to_state : ""

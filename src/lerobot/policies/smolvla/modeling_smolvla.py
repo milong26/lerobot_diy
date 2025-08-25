@@ -75,7 +75,6 @@ from lerobot.policies.utils import (
     populate_queues,
 )
 from lerobot.utils.utils import get_safe_dtype
-from simplify_work.tools.calculate_state_for_norm import compute_last4_stats
 
 
 IS_LOCAL = os.environ.get("ENV", "") == "local"
@@ -181,21 +180,23 @@ def load_smolvla(
     state_dict = {k: v for k, v in state_dict.items() if not k.startswith(norm_keys)}
 
     missing, unexpected = model.load_state_dict(state_dict, strict=False)
-     # 🔑 处理 state 维度扩展
-    if model.add_location_to_state:
-        with torch.no_grad():
-            old_dim = 6  # 你原来的预训练模型输入维度
-            new_dim = 10
-            if "model.state_proj.weight" in state_dict:         # shape [hidden, 10]
-                model.model.state_proj.weight[:, old_dim:new_dim] = torch.empty(
-                        model.model.state_proj.weight[:, old_dim:new_dim].shape
-                    )
-                nn.init.xavier_uniform_(model.model.state_proj.weight[:, old_dim:new_dim])
+    # # 训练的时候需要用，但推理的时候不能，但我不知道咋改
+    # if model.add_location_to_state and model.model.state_proj:
+    #     print(f"初始化之前state_proj的值",model.model.state_proj.weight[0,:])
+    #     with torch.no_grad():
+    #         old_dim = 6  # 你原来的预训练模型输入维度
+    #         new_dim = 10
+    #         if "model.state_proj.weight" in state_dict:         # shape [hidden, 10]
+    #             model.model.state_proj.weight[:, old_dim:new_dim] = torch.empty(
+    #                     model.model.state_proj.weight[:, old_dim:new_dim].shape
+    #                 )
+    #             nn.init.xavier_uniform_(model.model.state_proj.weight[:, old_dim:new_dim])
 
-            # bias 可以清零或者保持原值
-            if model.model.state_proj.bias is not None:
-                model.model.state_proj.bias[old_dim:new_dim].zero_()
-            print(f"初始化 state_proj 新增维度: {old_dim} -> {new_dim}")
+    #         # bias 可以清零或者保持原值
+    #         if model.model.state_proj.bias is not None:
+    #             model.model.state_proj.bias[old_dim:new_dim].zero_()
+    #         print(f"初始化 state_proj 新增维度: {old_dim} -> {new_dim}")
+    #         print(f"初始化之后state_proj的值",model.model.state_proj.weight[0,:])
                 
 
     if not all(key.startswith(norm_keys) for key in missing) or unexpected:
@@ -375,6 +376,8 @@ class SmolVLAPolicy(PreTrainedPolicy):
         super().__init__(config)
         config.validate_features()
         self.config = config
+        # dataset_stats就是mean,max,count这些，原来的state只有6维。在make_policy的时候也处理了
+        # input_features倒是已经被我提前处理成10维了
         self.normalize_inputs = Normalize(config.input_features, config.normalization_mapping, dataset_stats)
         self.normalize_targets = Normalize(
             config.output_features, config.normalization_mapping, dataset_stats
@@ -383,7 +386,6 @@ class SmolVLAPolicy(PreTrainedPolicy):
             config.output_features, config.normalization_mapping, dataset_stats
         )
 
-        # self.language_tokenizer = AutoProcessor.from_pretrained(self.config.vlm_model_name).tokenizer
 
         # 导入vlm_model
         self.config.vlm_model_name="models/forsmolvla/HuggingFaceTB/SmolVLM2-500M-Video-Instruct"
@@ -391,11 +393,6 @@ class SmolVLAPolicy(PreTrainedPolicy):
     
         self.model = VLAFlowMatching(config)
         self.add_location_to_state=config.add_location_to_state
-        # 加载
-        if self.add_location_to_state:
-            self.add_state_dim=compute_last4_stats(self.add_location_to_state)
-        else:
-            self.add_state_dim=None
         self.reset()
 
 
@@ -422,6 +419,24 @@ class SmolVLAPolicy(PreTrainedPolicy):
             device=map_location,
             checkpoint_keys_mapping="model._orig_mod.//model.",
         )
+    # 初始化，只会在训练的时候执行
+    def init_new_state_proj_columns(self, old_in_features: int):
+        print(f"初始化之前state_proj[0]的值",self.model.state_proj.weight[0,:],self.model.state_proj.bias[0])
+        if self.add_location_to_state and self.model.state_proj:
+            """只初始化 state_proj 的新增列"""
+            import math
+            fan_in = self.model.state_proj.in_features
+            bound = 1 / math.sqrt(fan_in) # 32
+            with torch.no_grad():
+                # 只初始化新增列（7-10列）
+                self.model.state_proj.weight[:, old_in_features:old_in_features+4] = torch.empty(
+                    (self.model.state_proj.out_features, 4)
+                ).uniform_(-bound, bound)
+                # if self.model.state_proj.bias is not None:
+                #     self.model.state_proj.bias.uniform_(-bound, bound)
+            print(f"初始化之后state_proj[0]的值",self.model.state_proj.weight[0,:],self.model.state_proj.bias[0])
+
+
 
     def get_optim_params(self) -> dict:
         return self.parameters()
@@ -571,17 +586,6 @@ class SmolVLAPolicy(PreTrainedPolicy):
         if self.config.adapt_to_pi_aloha:
             batch[OBS_STATE] = self._pi_aloha_decode_state(batch[OBS_STATE])
             batch[ACTION] = self._pi_aloha_encode_actions_inv(batch[ACTION])
-        # 提前处理if 增加了state
-        if self.add_location_to_state:
-            adding_state_stat = {
-                "min": torch.tensor(self.add_state_dim["min"], dtype=torch.float32),
-                "max": torch.tensor(self.add_state_dim["max"], dtype=torch.float32),
-                "mean": torch.tensor(self.add_state_dim["mean"], dtype=torch.float32),
-                "std": torch.tensor(self.add_state_dim["std"], dtype=torch.float32),
-            }
-        else:
-            adding_state_stat=None
-        batch = self.normalize_inputs(batch,adding_state_stat)
         batch = self.normalize_targets(batch)
         images, img_masks = self.prepare_images(batch)
         state = self.prepare_state(batch)
@@ -590,6 +594,11 @@ class SmolVLAPolicy(PreTrainedPolicy):
         actions_is_pad = batch.get("actions_id_pad")
         loss_dict = {}
         losses = self.model.forward(images, img_masks, lang_tokens, lang_masks, state, actions, noise, time)
+        # 检查验证 state_proj 的权重确实收到了梯度
+        # losses.mean().backward()
+        # print("检查确实梯度更新",self.model.state_proj.weight.grad.tolist())
+        # raise KeyError("检查验证 state_proj 的权重确实收到了梯度")
+
         loss_dict["losses_after_forward"] = losses.clone()
 
         if actions_is_pad is not None:
@@ -774,7 +783,7 @@ class VLAFlowMatching(nn.Module):
     def __init__(self, config: SmolVLAConfig):
         super().__init__()
         self.config = config
-
+        # 初始化vlm_with_expert=SmolVLMWithExpertModel
         self.vlm_with_expert = SmolVLMWithExpertModel(
             model_id=self.config.vlm_model_name,
             freeze_vision_encoder=self.config.freeze_vision_encoder,
@@ -786,34 +795,41 @@ class VLAFlowMatching(nn.Module):
             self_attn_every_n_layers=self.config.self_attn_every_n_layers,
             expert_width_multiplier=self.config.expert_width_multiplier,
         )
+        # state_proj：把环境 state 从 max_state_dim 投到 文本隐藏维（text_config.hidden_size），使状态能与图像/语言在同一维度拼接。max_state_dim设置32，text_config.hidden_size默认是960
+        # 这个投影会有weight和bias嘛？
         self.state_proj = nn.Linear(
             self.config.max_state_dim, self.vlm_with_expert.config.text_config.hidden_size
         )
+        # 类似的，action padding到vlm_with_expert的expert_hidden_size，输出action也互换
         self.action_in_proj = nn.Linear(self.config.max_action_dim, self.vlm_with_expert.expert_hidden_size)
         self.action_out_proj = nn.Linear(self.vlm_with_expert.expert_hidden_size, self.config.max_action_dim)
-
+        # “时间-动作”融合 MLP：action_time_mlp_in: 把拼接后的 [action_emb, time_emb]（维度 2×D_exp）压回到 D_exp；action_time_mlp_out: 再线性变换一次（配合中间的 SiLU 激活）。
         self.action_time_mlp_in = nn.Linear(
             self.vlm_with_expert.expert_hidden_size * 2, self.vlm_with_expert.expert_hidden_size
         )
         self.action_time_mlp_out = nn.Linear(
             self.vlm_with_expert.expert_hidden_size, self.vlm_with_expert.expert_hidden_size
         )
-
+        # 设置self.state_proj中的每个参数，设置require_grad=true
         self.set_requires_grad()
+        # 特殊图像的token
         self.fake_image_token = self.vlm_with_expert.processor.tokenizer.fake_image_token_id
         self.global_image_token = self.vlm_with_expert.processor.tokenizer.global_image_token_id
         self.global_image_start_token = torch.tensor(
             [self.fake_image_token, self.global_image_token], dtype=torch.long
         )
-
         self.add_image_special_tokens = self.config.add_image_special_tokens
         self.image_end_token = torch.tensor([self.fake_image_token], dtype=torch.long)
+        # 在embed_prefix里面如果真实拼接出来的 token 少于 prefix_length，就补零到这个长度。
         self.prefix_length = self.config.prefix_length
 
     def set_requires_grad(self):
+        # requires_grad=True：表示在 反向传播（backpropagation）时，PyTorch 会为这些参数计算梯度，并且这些梯度会存到 param.grad。在 optimizer.step() 时，这些参数会根据梯度被更新，从而参与训练。
+        # 这个时候应该是960*32+960个参数
         for params in self.state_proj.parameters():
             params.requires_grad = self.config.train_state_proj
 
+    # 采样标准高斯噪声 N(0,1)，形状与 actions 一致 (B, T_act, A_dim)
     def sample_noise(self, shape, device):
         noise = torch.normal(
             mean=0.0,
@@ -823,13 +839,15 @@ class VLAFlowMatching(nn.Module):
             device=device,
         )
         return noise
-
+    
+    # 从 Beta(1.5, 1.0) 采样标量时间 t∈(0,1)，再线性裁剪到 [0.001, 0.999]。返回形状 (B,) 在flowmatching训练的时候用来采样一个随机时间步的
     def sample_time(self, bsize, device):
         beta_dist = torch.distributions.Beta(concentration1=1.5, concentration0=1.0)
         time_beta = beta_dist.sample((bsize,)).to(device=device, dtype=torch.float32)
         time = time_beta * 0.999 + 0.001
         return time
 
+    # 前缀嵌入：(images, img_masks, lang_tokens, lang_masks, state)
     def embed_prefix(
         self, images, img_masks, lang_tokens, lang_masks, state: torch.Tensor = None
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -839,11 +857,13 @@ class VLAFlowMatching(nn.Module):
         embs = []
         pad_masks = []
         att_masks = []
+        # 处理图像
         for _img_idx, (
             img,
             img_mask,
         ) in enumerate(zip(images, img_masks, strict=False)):
             if self.add_image_special_tokens:
+                # 只是特殊符号，所以用text_model
                 image_start_token = (
                     self.vlm_with_expert.embed_language_tokens(
                         self.global_image_start_token.to(device=self.vlm_with_expert.vlm.device)
@@ -857,7 +877,7 @@ class VLAFlowMatching(nn.Module):
                 att_masks += [0] * (image_start_mask.shape[-1])
                 embs.append(image_start_token)
                 pad_masks.append(image_start_mask)
-
+            # 真正的图像处理
             img_emb = self.vlm_with_expert.embed_image(img)
             img_emb = img_emb
 
@@ -886,6 +906,7 @@ class VLAFlowMatching(nn.Module):
                 embs.append(image_end_token)
                 pad_masks.append(image_end_mask)
                 att_masks += [0] * (image_end_mask.shape[1])
+        # 语言嵌入
         lang_emb = self.vlm_with_expert.embed_language_tokens(lang_tokens)
         # Normalize language embeddings
         lang_emb_dim = lang_emb.shape[-1]
@@ -896,19 +917,36 @@ class VLAFlowMatching(nn.Module):
 
         num_lang_embs = lang_emb.shape[1]
         att_masks += [0] * num_lang_embs
-
+        # 状态嵌入，要改肯定改这里，如果要改的话还要加一个，self.config里面有吗？
+        # 可以用self.add_location_to_state（或者改成train_add_location_to_state）
+        # 投影到self.vlm_with_expert.config.text_config.hidden_size对应的维数，把状态维度投影到 和语言/图像 token 相同的 hidden_size
+        # 此时的state_embed变成e([64, 960])
         state_emb = self.state_proj(state)
+        # 如果只有2维？就加个维。这里也应该肯定是2d的吧
+        # 此时变成了torch.Size([64, 1, 960])
         state_emb = state_emb[:, None, :] if state_emb.ndim == 2 else state_emb
+        # 追加到总的embs,embs从（image_end_token，lang_emb）变成（image_end_token，lang_emb，state_emb）
         embs.append(state_emb)
+        # bsize就是batchsize
         bsize = state_emb.shape[0]
         device = state_emb.device
-
+        # states_seq_len就是状态token的个数，为什么只是1？
+        # 这个1表示每一个样本的state被当作一个token，而不是一个960维的长向量
+        # 最终的输入序列会变成 一个batch里面样本 1: [ 图像token1, 图像token2, 语言token1, state_token ],...样本 64: [ 图像token1, 图像token2, 语言token1, state_token ]
+        # 所以最终的输入序列是[64, seq_len, hidden_dim]
         states_seq_len = state_emb.shape[1]
+        # 这段token没有padding，形状是((B, states_seq_len))
         state_mask = torch.ones(bsize, states_seq_len, dtype=torch.bool, device=device)
+        # 这个makstate都是true，大小是[64, 1])
+        # state_mask.shape是([64, 1])
         pad_masks.append(state_mask)
 
         # Set attention masks so that image and language inputs do not attend to state or actions
         att_masks += [1] * (states_seq_len)
+
+        # states_seq_len是1
+
+        # 总共
         embs = torch.cat(embs, dim=1)
         pad_masks = torch.cat(pad_masks, dim=1)
         att_masks = torch.tensor(att_masks, dtype=torch.bool, device=pad_masks.device)
@@ -980,16 +1018,19 @@ class VLAFlowMatching(nn.Module):
         time_expanded = time[:, None, None]
         x_t = time_expanded * noise + (1 - time_expanded) * actions
         u_t = noise - actions
+        # 调用embed_prefix和embed——sufix生成前缀与后缀嵌入 + 掩码：
         prefix_embs, prefix_pad_masks, prefix_att_masks = self.embed_prefix(
             images, img_masks, lang_tokens, lang_masks, state=state
         )
         suffix_embs, suffix_pad_masks, suffix_att_masks = self.embed_suffix(x_t, time)
-
+        # 合并mask
         pad_masks = torch.cat([prefix_pad_masks, suffix_pad_masks], dim=1)
         att_masks = torch.cat([prefix_att_masks, suffix_att_masks], dim=1)
-
+        # 把 1D 的“是否是 padding” 与 1D 的“前缀/后缀域标签(0/1)” 组合成最终的 二维注意力 mask
         att_2d_masks = make_att_2d_masks(pad_masks, att_masks)
+        # 为每个真实 token分配连续位置编码（padding 不计入）
         position_ids = torch.cumsum(pad_masks, dim=1) - 1
+        # 送入主干模型
         (_, suffix_out), _ = self.vlm_with_expert.forward(
             attention_mask=att_2d_masks,
             position_ids=position_ids,

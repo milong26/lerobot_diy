@@ -555,10 +555,16 @@ class LeRobotDataset(torch.utils.data.Dataset):
             if points_3d and len(points_3d) >= 2:
                 gripper_pos, object_pos = self.obj_detector.transform_camera_to_custom_coordsystem(points_3d)[:2]
                 if gripper_pos is not None and object_pos is not None:
-                    dx = round((object_pos[0] - gripper_pos[0])/unit_mter)
-                    dy = round((object_pos[1] - gripper_pos[1])/unit_mter)
-                    dz = round((object_pos[2] - gripper_pos[2])/unit_mter)
-                    flag = 1.0
+                    if unit_mter==1:
+                        dx = object_pos[0] - gripper_pos[0]
+                        dy = object_pos[1] - gripper_pos[1]
+                        dz = object_pos[2] - gripper_pos[2]
+                        flag = 1.0
+                    else:
+                        dx = round((object_pos[0] - gripper_pos[0])/unit_mter)
+                        dy = round((object_pos[1] - gripper_pos[1])/unit_mter)
+                        dz = round((object_pos[2] - gripper_pos[2])/unit_mter)
+                        flag = 1.0
     
         merged_state = torch.cat([orig_state, torch.tensor([[dx, dy, dz, flag]], dtype=orig_state.dtype)], dim=1)
         item["observation.state"] = merged_state
@@ -882,9 +888,6 @@ class LeRobotDataset(torch.utils.data.Dataset):
         # 过滤无用 key
         if self.exclude_features:
             item = {k: v for k, v in item.items() if k not in self.exclude_features}
-        
-
-
         return item
 
     def __repr__(self):

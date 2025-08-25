@@ -9,7 +9,7 @@ dataset:
   root: training_dataset/0803_with_red/pickplace/first100
 
 batch_size: 64
-steps: 60000
+steps: 30000
 output_dir: outputs/train/0807/language_mtask_structural
 job_name: training_pickplace_with_first100_relative_language_struct
 wandb:
@@ -29,4 +29,4 @@ use_true_depth: true
 # "mtask_{self.language_tip_mode}.jsonl"
 # language_tip_mode: strcutural
 #
-add_location_to_state: true
+add_location_to_state: "pure"

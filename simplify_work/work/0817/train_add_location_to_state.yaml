@@ -8,8 +8,8 @@ dataset:
   root: training_dataset/0803_with_red/pickplace/first100
 
 batch_size: 64
-steps: 30000
-output_dir: outputs/train/0817/add_state_1
+steps: 10000
+output_dir: outputs/train/0817/mstate_check_state_proj
 job_name: add_state
 wandb:
   enable: false
@@ -26,4 +26,4 @@ policy:
 # 会找数据集里面f"mtask_{self.language_tip_mode}.jsonl"的文件
 language_tip_mode: "" 
 # 控制是将location加到state里面
-add_location_to_state:  true
+add_location_to_state:  "pure"

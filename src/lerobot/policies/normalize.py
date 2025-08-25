@@ -150,7 +150,7 @@ class Normalize(nn.Module):
 
     # TODO(rcadene): should we remove torch.no_grad?
     @torch.no_grad()
-    def forward(self, batch: dict[str, Tensor], adding_state_stat=None) -> dict[str, Tensor]:
+    def forward(self, batch: dict[str, Tensor]) -> dict[str, Tensor]:
         # TODO: Remove this shallow copy
         batch = dict(batch)  # shallow copy avoids mutating the input batch
         for key, ft in self.features.items():
@@ -164,58 +164,15 @@ class Normalize(nn.Module):
 
             buffer = getattr(self, "buffer_" + key.replace(".", "_"))
 
-             # 如果是 state 并且需要扩展统计量
-             # 选择统计量
-            if key == "observation.state" and adding_state_stat is not None:
-                if norm_mode is NormalizationMode.MEAN_STD:
-                    mean = buffer["mean"]
-                    std  = buffer["std"]
-
-                    extra_mean = torch.as_tensor(
-                        adding_state_stat["mean"], dtype=mean.dtype, device=mean.device
-                    )
-                    extra_std  = torch.as_tensor(
-                        adding_state_stat["std"],  dtype=std.dtype,  device=std.device
-                    )
-
-                    mean = torch.cat([mean, extra_mean], dim=-1)
-                    std  = torch.cat([std,  extra_std],  dim=-1)
-
-                elif norm_mode is NormalizationMode.MIN_MAX:
-                    minv = buffer["min"]
-                    maxv = buffer["max"]
-
-                    extra_min = torch.as_tensor(
-                        adding_state_stat["min"], dtype=minv.dtype, device=minv.device
-                    )
-                    extra_max = torch.as_tensor(
-                        adding_state_stat["max"], dtype=maxv.dtype, device=maxv.device
-                    )
-
-                    minv = torch.cat([minv, extra_min], dim=-1)
-                    maxv = torch.cat([maxv, extra_max], dim=-1)
-
-                else:
-                    raise ValueError(norm_mode)
-
-            else:
-                # 原逻辑
-                if norm_mode is NormalizationMode.MEAN_STD:
-                    mean = buffer["mean"]
-                    std  = buffer["std"]
-                elif norm_mode is NormalizationMode.MIN_MAX:
-                    minv = buffer["min"]
-                    maxv = buffer["max"]
-
             if norm_mode is NormalizationMode.MEAN_STD:
-                # mean = buffer["mean"]
-                # std = buffer["std"]
+                mean = buffer["mean"]
+                std = buffer["std"]
                 assert not torch.isinf(mean).any(), _no_stats_error_str("mean")
                 assert not torch.isinf(std).any(), _no_stats_error_str("std")
                 batch[key] = (batch[key] - mean) / (std + 1e-8)
             elif norm_mode is NormalizationMode.MIN_MAX:
-                # min = buffer["min"]
-                # max = buffer["max"]
+                min = buffer["min"]
+                max = buffer["max"]
                 assert not torch.isinf(min).any(), _no_stats_error_str("min")
                 assert not torch.isinf(max).any(), _no_stats_error_str("max")
                 # normalize to [0,1]
