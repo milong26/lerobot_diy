@@ -31,4 +31,4 @@ add_location_to_state:  ""
 freeze_except_7_10: false
 
 # --policy.path=models/forsmolvla/smolvla_base
-# 用的代码是3f372d0
+# 用的代码是c38517a

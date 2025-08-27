@@ -275,7 +275,7 @@ def train(cfg: TrainPipelineConfig):
         if cfg.freeze_except_7_10:
         # w1_6_means.append(output_dict["w_1_6_mean"])
             w7_10_means.append(output_dict["w_7_10_mean"])
-            w7_10_norms = output_dict["w_7_10_norm"]
+            w7_10_norms.append(output_dict["w_7_10_norm"])
             # w_all.append(output_dict["w_snapshot"])
 
         # Note: eval and checkpoint happens *after* the `step`th training update has completed, so we
