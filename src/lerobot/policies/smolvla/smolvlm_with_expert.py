@@ -89,8 +89,6 @@ class SmolVLMWithExpertModel(nn.Module):
             self.vlm = SmolVLMForConditionalGeneration(config=config)
         # 处理器处理器（分词器 + 图像预处理），也是model_id
         self.processor = AutoProcessor.from_pretrained(model_id)
-
-
         if num_vlm_layers > 0:
             print(f"Reducing the number of VLM layers to {num_vlm_layers} ...")
             # 就是self.vlm.model
@@ -107,7 +105,8 @@ class SmolVLMWithExpertModel(nn.Module):
         lm_expert_config.hidden_size = int(hidden_size * expert_width_multiplier)  # hidden_size // 2
         lm_expert_config.intermediate_size = get_intermediate_size(int(hidden_size * expert_width_multiplier))
         lm_expert_config.num_hidden_layers = self.num_vlm_layers
-        if num_expert_layers > 0: # 默认代码是0，所以没有做稀疏，直接层层对应的
+        if num_expert_layers > 0: 
+        # 默认代码是0，所以没有做稀疏，直接层层对应的
             assert len(self.get_vlm_model().text_model.layers) % num_expert_layers == 0, (
                 f"Number of layers in the VLM {len(self.get_vlm_model().text_model.layers)} are not multiple of num_expert_layers {num_expert_layers}"
             )

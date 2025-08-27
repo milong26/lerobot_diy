@@ -180,24 +180,6 @@ def load_smolvla(
     state_dict = {k: v for k, v in state_dict.items() if not k.startswith(norm_keys)}
 
     missing, unexpected = model.load_state_dict(state_dict, strict=False)
-    # # 训练的时候需要用，但推理的时候不能，但我不知道咋改
-    # if model.add_location_to_state and model.model.state_proj:
-    #     print(f"初始化之前state_proj的值",model.model.state_proj.weight[0,:])
-    #     with torch.no_grad():
-    #         old_dim = 6  # 你原来的预训练模型输入维度
-    #         new_dim = 10
-    #         if "model.state_proj.weight" in state_dict:         # shape [hidden, 10]
-    #             model.model.state_proj.weight[:, old_dim:new_dim] = torch.empty(
-    #                     model.model.state_proj.weight[:, old_dim:new_dim].shape
-    #                 )
-    #             nn.init.xavier_uniform_(model.model.state_proj.weight[:, old_dim:new_dim])
-
-    #         # bias 可以清零或者保持原值
-    #         if model.model.state_proj.bias is not None:
-    #             model.model.state_proj.bias[old_dim:new_dim].zero_()
-    #         print(f"初始化 state_proj 新增维度: {old_dim} -> {new_dim}")
-    #         print(f"初始化之后state_proj的值",model.model.state_proj.weight[0,:])
-                
 
     if not all(key.startswith(norm_keys) for key in missing) or unexpected:
         raise RuntimeError(
@@ -457,21 +439,11 @@ class SmolVLAPolicy(PreTrainedPolicy):
             if k in self._queues and k != ACTION:
                 batch_dict[k] = torch.stack(list(self._queues[k]), dim=1)
 
-        """
-        下面这四行在服务器运行。输入batch，返回actions
-        images, img_masks = self.prepare_images(batch)
-        state = self.prepare_state(batch)
-        lang_tokens, lang_masks = self.prepare_language(batch)
-
-        actions = self.model.sample_actions(images, img_masks, lang_tokens, lang_masks, state, noise=noise)
-        """
         # 开启服务器推理。本地使用这个，并且注释掉后面四行。
         if IS_LOCAL:
             actions=predict_from_server(batch_dict)
         else:
         # 服务器就注释掉上面一行，使用下面四行。
-
-
             images, img_masks = self.prepare_images(batch_dict)
             state = self.prepare_state(batch_dict)
             lang_tokens, lang_masks = self.prepare_language(batch_dict)
@@ -541,44 +513,6 @@ class SmolVLAPolicy(PreTrainedPolicy):
             # effectively has shape (n_action_steps, batch_size, *), hence the transpose.
             self._queues[ACTION].extend(actions.transpose(0, 1)[: self.config.n_action_steps])
 
-        """
-        增加跳步
-        """
-
-        # --- Warmup 阶段逻辑 ---
-        # if self._in_warmup:
-        #     # 获取目标距离
-        #     distance = count_distance(batch["observation.images.side"],batch["observation.images.side_depth"])
-
-        #     # 根据距离设置 warmup 步数
-        #     if distance is None:
-        #         warmup_n=1
-        #     else:
-        #         if distance >= 0.2:
-        #             warmup_n = 5  # 区间 A: 远距离，执行 5 步
-        #         elif distance >= 0.1:
-        #             warmup_n = 3  # 区间 B: 中距离，执行 3 步
-        #         else:
-        #             warmup_n = 1  # 区间 C: 近距离，执行 1 步
-
-        #     # 如果 queue 中不足 N 个，就提前补充
-        #     while len(self._queues[ACTION]) < warmup_n:
-        #         actions = self._get_action_chunk(batch, noise)
-        #         self._queues[ACTION].extend(actions.transpose(0, 1)[: self.config.n_action_steps])
-
-        #     # 取出 N 个动作做加权平均
-        #     action_list = [self._queues[ACTION].popleft() for _ in range(warmup_n)]
-        #     actions = torch.stack(action_list, dim=1)  # [B, N, D]
-
-        #     # 加权平均
-        #     weights = torch.linspace(1.0, 0.5, steps=warmup_n, device=actions.device)
-        #     weights = weights / weights.sum()
-        #     weights = weights.view(1, -1, 1)  # [1, N, 1]
-
-        #     weighted_action = (actions * weights).sum(dim=1)  # [B, D]
-        #     print(f"[Warmup] 距离: {distance}, 动作步数: {warmup_n},  剩余queue: {len(self._queues[ACTION])}")
-        #     return weighted_action
-        # print(f"走一步,剩余queue: {len(self._queues[ACTION])}")
         return self._queues[ACTION].popleft()
 
     def forward(self, batch: dict[str, Tensor], noise=None, time=None) -> dict[str, Tensor]:
@@ -586,12 +520,16 @@ class SmolVLAPolicy(PreTrainedPolicy):
         if self.config.adapt_to_pi_aloha:
             batch[OBS_STATE] = self._pi_aloha_decode_state(batch[OBS_STATE])
             batch[ACTION] = self._pi_aloha_encode_actions_inv(batch[ACTION])
+        # 这一行之前居然没有加上？？？
+        batch = self.normalize_inputs(batch)
         batch = self.normalize_targets(batch)
         images, img_masks = self.prepare_images(batch)
         state = self.prepare_state(batch)
         lang_tokens, lang_masks = self.prepare_language(batch)
         actions = self.prepare_action(batch)
-        actions_is_pad = batch.get("actions_id_pad")
+        # emm怎么说呢，纠结这里要不要改
+        actions_is_pad = batch.get("action_is_pad") 
+        # actions_is_pad = batch.get("actions_id_pad")
         loss_dict = {}
         losses = self.model.forward(images, img_masks, lang_tokens, lang_masks, state, actions, noise, time)
         # 检查验证 state_proj 的权重确实收到了梯度
@@ -680,10 +618,10 @@ class SmolVLAPolicy(PreTrainedPolicy):
         # 用了strcutured之后报错说token数量不一致，有的65，有的66
         tokenized_prompt = self.language_tokenizer.__call__(
             tasks,
-            # padding=self.config.pad_language_to,
+            padding=self.config.pad_language_to,
             padding_side="right",
-            padding=True,
-            truncation=True,       
+            # padding=True,
+            # truncation=True,       
             max_length=self.config.tokenizer_max_length,
             return_tensors="pt",
         )

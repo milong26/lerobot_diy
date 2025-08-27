@@ -70,6 +70,7 @@ def update_policy(
     lr_scheduler=None,
     use_amp: bool = False,
     lock=None,
+    freeze_except_7_10: bool= False
 ) -> tuple[MetricsTracker, dict]:
     start_time = time.perf_counter()
     device = get_device_from_parameters(policy)
@@ -98,20 +99,13 @@ def update_policy(
     # 到这里就完成了一次参数更新
 
     # 假设 policy.model.state_proj 是一个 nn.Linear
-    # with torch.no_grad():
-    #     w = policy.model.state_proj.weight.detach().cpu().clone()  # shape [32, 960]
-
-    #     # 取前 6 列
-    #     w_1_6 = w[:, 0:6]   # shape [32, 6]
-    #     # 取第 7-10 列
-    #     w_7_10 = w[:, 6:10] # shape [32, 4]
-
-    #     # 保存均值或范数，方便画曲线
-    #     output_dict["w_1_6_mean"] = w_1_6.mean().item()
-    #     output_dict["w_7_10_mean"] = w_7_10.mean().item()
-    #     output_dict["w_1_6_norm"] = w_1_6.norm().item()
-    #     output_dict["w_7_10_norm"] = w_7_10.norm().item()
-    #     output_dict["w_snapshot"] = w.numpy() 
+    if freeze_except_7_10:
+        with torch.no_grad():
+            w = policy.model.state_proj.weight.detach().cpu().clone()  # shape [32, 960]
+            # 取第 7-10 列
+            w_7_10 = w[:, 6:10] # shape [32, 4]
+            output_dict["w_7_10_mean"] = w_7_10.mean().item()
+            output_dict["w_7_10_norm"] = w_7_10.norm().item()
 
 
 
@@ -227,7 +221,9 @@ def train(cfg: TrainPipelineConfig):
 
 
     policy.train()
-    # policy.init_new_state_proj_columns(old_in_features=6)
+    if cfg.freeze_except_7_10:
+        # base模型要初始化7-10dim的weight
+        policy.init_new_state_proj_columns(old_in_features=6)
 
 
     train_metrics = {
@@ -243,13 +239,12 @@ def train(cfg: TrainPipelineConfig):
     )
 
     logging.info("Start offline training on a fixed dataset")
-    # w1_6_means = []
-    # w7_10_means = []
-    # w_all=[]
-    # # 先冻结
-    # for param in policy.parameters():
-    #     param.requires_grad = False
-    # policy.model.state_proj.weight.requires_grad=True
+    # 先冻结
+    if cfg.freeze_except_7_10:
+        for param in policy.parameters():
+            param.requires_grad = False
+        policy.model.state_proj.weight.requires_grad=True
+        w7_10_means = []
 
     def mask_grad(grad): 
         mask = torch.zeros_like(grad) 
@@ -274,18 +269,20 @@ def train(cfg: TrainPipelineConfig):
             grad_scaler=grad_scaler,
             lr_scheduler=lr_scheduler,
             use_amp=cfg.policy.use_amp,
+            freeze_except_7_10=cfg.freeze_except_7_10
         )
 
+        if cfg.freeze_except_7_10:
         # w1_6_means.append(output_dict["w_1_6_mean"])
-        # w7_10_means.append(output_dict["w_7_10_mean"])
-        # w_all.append(output_dict["w_snapshot"])
+            w7_10_means.append(output_dict["w_7_10_mean"])
+            # w_all.append(output_dict["w_snapshot"])
 
         # Note: eval and checkpoint happens *after* the `step`th training update has completed, so we
         # increment `step` here.
         step += 1
-        # if step % 200 == 0:
-        #     w7_10_mean = output_dict["w_7_10_mean"]
-        #     print(f"Step {step}: state_proj 7–10 cols 均值= {w7_10_mean:.6f}")
+        if step % 200 == 0 and cfg.freeze_except_7_10:
+            w7_10_mean = output_dict["w_7_10_mean"]
+            print(f"Step {step}: state_proj 7–10 cols 均值= {w7_10_mean:.6f}")
         train_tracker.step()
         is_log_step = cfg.log_freq > 0 and step % cfg.log_freq == 0
         is_saving_step = step % cfg.save_freq == 0 or step == cfg.steps
@@ -344,24 +341,15 @@ def train(cfg: TrainPipelineConfig):
     if eval_env:
         eval_env.close()
     logging.info("End of training")
+    if cfg.freeze_except_7_10:  
 
     # if cfg.policy.push_to_hub:
     #     policy.push_model_to_hub(cfg)
-    # import matplotlib.pyplot as plt
-    # plt.plot(w7_10_means, label="Cols 7–10 Mean")
-    # plt.legend()
-    # plt.savefig("state_proj_means.png", dpi=300)  # 保存到本地
-    # plt.close()  # 关闭画布，避免内存泄漏
-    # print("画完图了，已保存到 state_proj_means.png")
-    # with open("state_proj_means.txt", "w") as f:
-    #     f.write("Cols 1–6 Mean:\n")
-    #     np.savetxt(f, np.array(w1_6_means), fmt="%.6f")
-    #     f.write("\nCols 7–10 Mean:\n")
-    #     np.savetxt(f, np.array(w7_10_means), fmt="%.6f")
-    # weights = np.stack(w_all, axis=0)  # shape: (num_snapshots, out_dim, in_dim)
-    # np.savez("w_all_weights.npz", weights=weights)
-
-    # print(f"保存完成，文件名：w_all_weights.npz，shape={weights.shape}")
+        import matplotlib.pyplot as plt
+        plt.plot(w7_10_means, label="Cols 7–10 Mean")
+        plt.legend()
+        plt.savefig(f"state_proj_means_{cfg.add_location_to_state}.png", dpi=300)  # 保存到本地
+        plt.close()  # 关闭画布，避免内存泄漏
 
 
 def main():

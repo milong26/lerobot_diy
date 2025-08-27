@@ -1,6 +1,6 @@
 
 
-# nohup env CUDA_VISIBLE_DEVICES=0 HF_HUB_OFFLINE=1 PYTHONPATH=src   python -m lerobot.scripts.train   --config_path=simplify_work/work/train/train_template.yaml   --policy.path=models/forsmolvla/smolvla_base   --policy.repo_id=lerobot/smolvla_base   > logs/0727/train_100_depth_lang.log 2>&1 &
+# nohup env CUDA_VISIBLE_DEVICES=0 HF_HUB_OFFLINE=1 PYTHONPATH=src   python -m lerobot.scripts.train   --config_path=simplify_work/work/0826/train_mstate_step1.yaml --policy.path=models/forsmolvla/smolvla_base > logs/0826/train_mstate_test_step1.log 2>&1 &
 
 
 dataset:
@@ -8,9 +8,9 @@ dataset:
   root: training_dataset/0803_with_red/pickplace/first100
 
 batch_size: 64
-steps: 20000
-output_dir: outputs/train/0822/mstate_5cm_step1
-job_name: add_state_5cm_step1
+steps: 60000
+output_dir: outputs/train/0826/mstate_grid_5cm_step1
+job_name: add_state_5cm_step_1
 wandb:
   enable: false
 
@@ -19,7 +19,7 @@ policy:
   repo_id: lerobot/smolvla_base
   type: smolvla
   push_to_hub: false
-  optimizer_lr: 2e-4
+  optimizer_lr: 1e-4
 
 # 自定义内容
 
@@ -28,4 +28,6 @@ policy:
 language_tip_mode: "" 
 # 控制是将location加到state里面
 add_location_to_state:  "grid_5cm"
-# freeze_except_7_10: true
+freeze_except_7_10: true
+
+# --policy.path=models/forsmolvla/smolvla_base
