@@ -533,6 +533,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
 
         # self.modified_tasks = load_modified_tasks("training_dataset/0803_with_red/pickplace/first100/meta/relative_task_grid.jsonl")
         self.modified_tasks=None
+        # 训练的时候要用
         if self.language_tip_mode:
             tip_filename = f"mtask_{self.language_tip_mode}.jsonl"
             tip_file = self.root / "meta" / tip_filename
@@ -841,7 +842,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         # 每个episode开始的第一帧的query_indices
         episode_start_idx = self.episode_start_indices[ep_idx]
         frame_idx = [
-            i - episode_start_idx for i in query_indices['observation.images.side_depth']
+            i - episode_start_idx for i in query_indices['observation.images.side']
         ]
         # frame_idx=frame_idx[0]
         if len(self.meta.video_keys) > 0:

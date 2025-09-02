@@ -174,11 +174,6 @@ class VisionProcessor:
         updated_tasks = []
 
         for rgb, depth, task in zip(rgb_batch, depth_batch, task_batch):
-            # if "|" in task:
-            #     print("处理过了,pass")
-            #     updated_tasks.append(task)
-            #     continue
-
             points_3d = self.process_sample(rgb, depth)
             task_str = task  # 默认原始 task
 
@@ -186,73 +181,50 @@ class VisionProcessor:
                 converted_3d = self.transform_camera_to_custom_coordsystem(points_3d)
                 gripper_pos = converted_3d[0]
                 object_pos = converted_3d[1]
-                """
-                language_tip_mode有以下几种：
-                1. relative
-                2. grid_2cm
-                3. grid_5cm
-                4. grid_3cm没写好
-                """
-                
 
+                # 只有当 language_tip_mode 有值时才修改 task
                 if self.language_tip_mode:
-                    if self.language_tip_mode == "relative" or self.language_tip_mode == "relative_":
-                        # 只有当两个点都存在，才计算相对坐标
+                    if self.language_tip_mode in ["relative", "relative_"]:
                         if gripper_pos is not None and object_pos is not None:
                             dx = object_pos[0] - gripper_pos[0]
                             dy = object_pos[1] - gripper_pos[1]
                             dz = object_pos[2] - gripper_pos[2]
                             task_str = (f"{task}, sachet position relative to gripper is "
                                         f"({dx:.3f}, {dy:.3f}, {dz:.3f})")
-                        else:
-                            # 缺失任何一个，返回原始任务
-                            task_str = task
-
-                    elif self.language_tip_mode == "grid_5cm" or self.language_tip_mode == "relative_grid":
+                    elif self.language_tip_mode in ["grid_5cm", "relative_grid"]:
                         if gripper_pos is not None and object_pos is not None:
                             dx = object_pos[0] - gripper_pos[0]
                             dy = object_pos[1] - gripper_pos[1]
                             dz = object_pos[2] - gripper_pos[2]
-                            # 5cm = 0.05m
                             dx_grid = round(dx / 0.05)
                             dy_grid = round(dy / 0.05)
                             dz_grid = round(dz / 0.05)
                             task_str = (f"{task}, sachet position relative to gripper is "
                                         f"({dx_grid}, {dy_grid}, {dz_grid}) in 5cm grid units.")
-                        else:
-                            task_str = task
-                    # 结构化prompt需要修改
-                    elif self.language_tip_mode == "structural":
-                        pass
                     elif self.language_tip_mode == "grid_1cm":
                         if gripper_pos is not None and object_pos is not None:
                             dx = object_pos[0] - gripper_pos[0]
                             dy = object_pos[1] - gripper_pos[1]
                             dz = object_pos[2] - gripper_pos[2]
-                            # 5cm = 0.05m
                             dx_grid = round(dx / 0.01)
                             dy_grid = round(dy / 0.01)
                             dz_grid = round(dz / 0.01)
                             task_str = (f"{task}, sachet position relative to gripper is "
                                         f"({dx_grid}, {dy_grid}, {dz_grid}) in 1cm grid units.")
-                        else:
-                            task_str = task
                     elif self.language_tip_mode == "grid_2cm":
                         if gripper_pos is not None and object_pos is not None:
                             dx = object_pos[0] - gripper_pos[0]
                             dy = object_pos[1] - gripper_pos[1]
                             dz = object_pos[2] - gripper_pos[2]
-                            # 5cm = 0.05m
                             dx_grid = round(dx / 0.02)
                             dy_grid = round(dy / 0.02)
                             dz_grid = round(dz / 0.02)
                             task_str = (f"{task}, sachet position relative to gripper is "
                                         f"({dx_grid}, {dy_grid}, {dz_grid}) in 2cm grid units.")
-                        else:
-                            task_str = task
+                    elif self.language_tip_mode == "structural":
+                        pass  # TODO: 结构化 prompt 自定义
                     else:
-                        raise ValueError(f"language_tip_mode写成{self.language_tip_mode}")
-                        # 这个版本应该没用了，最多拿来计算
+                        # 未知的 language_tip_mode，拼接绝对坐标
                         gripper_str = (
                             f"({gripper_pos[0]:.3f}, {gripper_pos[1]:.3f}, {gripper_pos[2]:.3f})"
                             if gripper_pos is not None else None
@@ -262,22 +234,21 @@ class VisionProcessor:
                             if object_pos is not None else None
                         )
                         if gripper_str and object_str:
-                            task_str = f"{task} | gripper at {gripper_str},sachet at {object_str}"
+                            task_str = f"{task} | gripper at {gripper_str}, sachet at {object_str}"
                         elif gripper_str:
-                            task_str = f"{task} | gripper at {gripper_str}"
+                            task_str = f"{task} | gripper at {gripper_str}?"
                         elif object_str:
-                            task_str = f"{task} | sachet at {object_str}"
+                            task_str = f"{task} | sachet at {object_str}?"
                         else:
-                            task_str = f"{task} |"
-                else:
-                    # 就是空的，什么都不处理
-                    task_str = task
+                            task_str = f"{task} |?"
+                # 如果 language_tip_mode 为空，保持 task 原样
             else:
-                task_str = task
+                task_str = f"{task} |?"
 
             updated_tasks.append(task_str)
 
         return updated_tasks
+
 
 
 

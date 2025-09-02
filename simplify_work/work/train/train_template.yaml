@@ -5,7 +5,7 @@
 
 dataset:
   repo_id: lerobot/svla_so101_pickplace
-  root: training_dataset/0803_with_red/pickplace/first100
+  root: training_dataset/831/sponge_pickup
 
 batch_size: 64
 steps: 22000
