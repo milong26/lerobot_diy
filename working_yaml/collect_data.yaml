@@ -1,0 +1,45 @@
+
+# python -m lerobot.record --config_path simplify_work/collect_pure_data.yaml
+
+robot:
+  type: so100_follower
+  port: /dev/ttyACM0
+  id: congbi
+  cameras:
+    side:
+      type: intelrealsense
+      serial_number_or_name: 806312060427
+      width: 640
+      height: 480
+      fps: 30
+      use_depth: true
+    wrist:
+      type: opencv
+      index_or_path: 1
+      width: 640
+      height: 480
+      fps: 30
+  sensors:
+    wrist:
+      type: WowForceSensor
+      port: /dev/ttyACM3
+      num_mags: 5
+
+teleop:
+  type: so100_leader
+  port: /dev/ttyACM1
+  id: zhubi
+
+
+# 个性化
+display_data: false
+
+dataset:
+  repo_id: 831/earplug_pickup
+  num_episodes: 20
+  single_task: "Pick up a yellow sponge and place it inside the box"
+  episode_time_s: 15
+  push_to_hub: false
+  reset_time_s: 2
+
+resume: True 
