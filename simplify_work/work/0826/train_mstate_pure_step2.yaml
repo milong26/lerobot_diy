@@ -8,7 +8,7 @@ dataset:
   root: training_dataset/0803_with_red/pickplace/first100
 
 batch_size: 64
-steps: 60000
+steps: 26000
 output_dir: outputs/train/0826/mstate_pure_step2
 job_name: add_state_step_2
 wandb:
@@ -19,7 +19,7 @@ policy:
   repo_id: lerobot/smolvla_base
   type: smolvla
   push_to_hub: false
-  optimizer_lr: 1e-4
+  # optimizer_lr: 1e-4
 
 # 自定义内容
 
@@ -30,4 +30,4 @@ language_tip_mode: ""
 add_location_to_state:  "pure"
 freeze_except_7_10: false
 
-# --policy.path=models/forsmolvla/smolvla_base
+# --policy.path=

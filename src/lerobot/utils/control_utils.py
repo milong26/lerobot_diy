@@ -22,6 +22,7 @@ import traceback
 from contextlib import nullcontext
 from copy import copy
 from functools import cache
+
 import numpy as np
 import torch
 from deepdiff import DeepDiff
@@ -118,7 +119,9 @@ def predict_action(
             observation[name] = observation[name].unsqueeze(0)
             observation[name] = observation[name].to(device)
             # 把force变成dtype32的，没必要保留64
+            # 但是最后也没用上就是了
             if "force" in name:
+                print("observation里面不应该包含force")
                 observation[name] = observation[name].to(dtype=torch.float32)
 
         observation["task"] = task if task else ""
@@ -126,8 +129,6 @@ def predict_action(
 
         # Compute the next action with the policy
         # based on the current observation
-
- 
         action = policy.select_action(observation)
 
         # Remove batch dimension

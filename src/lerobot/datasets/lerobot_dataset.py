@@ -539,7 +539,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
             if not tip_file.exists():
                 raise FileNotFoundError(f"训练需要的文件不存在: {tip_file}")
             self.modified_tasks = load_modified_tasks(tip_file)
-            print("self.modified_tasks举例：",self.modified_tasks[0][0])
+            print("self.modified_tasks举例：",self.modified_tasks[1][0])
 
 
     # 先按照6+4拼接，返回state
@@ -861,21 +861,23 @@ class LeRobotDataset(torch.utils.data.Dataset):
         # Add task as a string
         # 原来准备用yolo的，0804重新采集数据之后可以用opencv直接定位了
         # 但是准确率不准，有缺失，训练数据还是用干净的比较好
-        if self.language_tip_mode and self.modified_tasks:
-            # 从本地读取
+        if self.language_tip_mode:
             if not len(frame_idx) == 1:
-                raise ValueError("一次getitem应该只获取一个")
-            frame_idx=frame_idx[0]
-            if hasattr(self, "modified_tasks") and ep_idx in self.modified_tasks and frame_idx in self.modified_tasks[ep_idx]:
-            # if ep_idx in self.modified_tasks and frame_idx in self.modified_tasks[ep_idx]:
+                raise ValueError("一次getitem应该只获取一个 frame")
+            frame_idx = frame_idx[0]
+            # 严格要求 JSONL 文件必须有对应 ep_idx/frame_idx
+            if ep_idx in self.modified_tasks and frame_idx in self.modified_tasks[ep_idx]:
                 item["task"] = self.modified_tasks[ep_idx][frame_idx]
             else:
-                task_idx = item["task_index"].item()
-                item["task"] = self.meta.tasks[task_idx]
+                raise KeyError(
+                    f"language_tip_mode={self.language_tip_mode} requires task from JSONL,本地没有 "
+                    f"but no entry found for episode {ep_idx}, frame {frame_idx}"
+                )
         else:
-        # 平常的task
+            # language_tip_mode 为空，使用原始 task
             task_idx = item["task_index"].item()
             item["task"] = self.meta.tasks[task_idx]
+
                 # add_location_to_state
         if self.add_location_to_state:
             if self.add_location_to_state=="pure":
@@ -984,6 +986,8 @@ class LeRobotDataset(torch.utils.data.Dataset):
         """
         if not episode_data:
             episode_buffer = self.episode_buffer
+        else:
+            episode_buffer = episode_data
 
         validate_episode_buffer(episode_buffer, self.meta.total_episodes, self.features)
 

@@ -77,6 +77,8 @@ from lerobot.transport import (
     services_pb2_grpc,  # type: ignore
 )
 from lerobot.transport.utils import grpc_channel_options, send_bytes_in_chunks
+
+
 # 因为keyboard需要权限
 from pynput import keyboard
 from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
@@ -144,7 +146,7 @@ class RobotClient:
         # Use an event for thread-safe coordination
         self.must_go = threading.Event()
         self.must_go.set()  # Initially set - observations qualify for direct processing
-        self.latest_distance = 0 # 本地计算出距离
+        self.latest_distance = 0 # 本地计算出距离 单纯是为了快慢加的
         # 初始化一个_detector?
         self.obj_detector = VisionProcessor()
         # 监听键盘输入->的时候清空action缓存
@@ -262,7 +264,6 @@ class RobotClient:
             timestamps = sorted([action.get_timestep() for action in self.action_queue.queue])
         self.logger.debug(f"Queue size: {queue_size}, Queue contents: {timestamps}")
         return queue_size, timestamps
-    
 
     # 服务器传来的action怎么放到action queue
     def _aggregate_action_queues(
@@ -327,9 +328,7 @@ class RobotClient:
 
                 # Deserialize bytes back into list[TimedAction]
                 deserialize_start = time.perf_counter()
-
                 timed_actions = pickle.loads(actions_chunk.data)  # nosec
-                
                 deserialize_time = time.perf_counter() - deserialize_start
 
                 self.action_chunk_size = max(self.action_chunk_size, len(timed_actions))
@@ -340,11 +339,6 @@ class RobotClient:
                         latest_action = self.latest_action
 
                     self.logger.debug(f"Current latest action: {latest_action}")
-
-                    # Get queue state before changes
-                    old_size, old_timesteps = self._inspect_action_queue()
-                    if not old_timesteps:
-                        old_timesteps = [latest_action]  # queue was empty
 
                     # Get queue state before changes
                     old_size, old_timesteps = self._inspect_action_queue()
@@ -429,12 +423,12 @@ class RobotClient:
             # Get action from queue
             # timed_action = self.action_queue.get_nowait()
             # 一次取num_actions个
+            self.action_queue_size.append(self.action_queue.qsize())
             for _ in range(min(num_actions, self.action_queue.qsize())):
                 timed_actions.append(self.action_queue.get_nowait())
-            self.action_queue_size.append(self.action_queue.qsize())
 
-        if not timed_actions:
-            return {}
+        # if not timed_actions:
+        #     return {}
         
         # 平均动作
         if len(timed_actions) == 1:

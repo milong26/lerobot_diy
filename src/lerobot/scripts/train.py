@@ -82,6 +82,7 @@ def update_policy(
 
     # Unscale the gradient of the optimizer's assigned params in-place **prior to gradient clipping**.
     grad_scaler.unscale_(optimizer)
+
     grad_norm = torch.nn.utils.clip_grad_norm_(
         policy.parameters(),
         grad_clip_norm,
@@ -96,9 +97,7 @@ def update_policy(
     grad_scaler.update()
 
     optimizer.zero_grad()
-    # 到这里就完成了一次参数更新
-
-    # 假设 policy.model.state_proj 是一个 nn.Linear
+    # 到这里就完成了一次参数更
     if freeze_except_7_10:
         with torch.no_grad():
             w = policy.model.state_proj.weight.detach().cpu().clone()  # shape [32, 960]
@@ -106,7 +105,6 @@ def update_policy(
             w_7_10 = w[:, 6:10] # shape [32, 4]
             output_dict["w_7_10_mean"] = w_7_10.mean().item()
             output_dict["w_7_10_norm"] = w_7_10.norm().item()
-
 
 
     # Step through pytorch scheduler at every batch instead of epoch
@@ -198,15 +196,11 @@ def train(cfg: TrainPipelineConfig):
         dataset,
         num_workers=cfg.num_workers,
         batch_size=cfg.batch_size,
-        shuffle=False,
+        shuffle=shuffle,
         sampler=sampler,
         pin_memory=device.type == "cuda",
         drop_last=False,
     )
-
-
-
-
 
         # 检查
     # peek_batch = next(iter(raw_dataloader))
@@ -214,7 +208,6 @@ def train(cfg: TrainPipelineConfig):
     # print("task示例",peek_batch["task"][0])
     # print("state示例",peek_batch["observation.state"][0])
     # raise KeyError("输出检查")
-
 
     # start train
     dl_iter = cycle(raw_dataloader)
@@ -239,18 +232,20 @@ def train(cfg: TrainPipelineConfig):
     )
 
     logging.info("Start offline training on a fixed dataset")
-    # 先冻结
+    # 先冻结别的
     if cfg.freeze_except_7_10:
         for param in policy.parameters():
             param.requires_grad = False
         policy.model.state_proj.weight.requires_grad=True
         w7_10_means = []
+        w7_10_norms = []
 
-    def mask_grad(grad): 
-        mask = torch.zeros_like(grad) 
-        mask[:, 6:10] = 1 
-        return grad * mask 
-    policy.model.state_proj.weight.register_hook(mask_grad)
+        def mask_grad(grad): 
+            mask = torch.zeros_like(grad) 
+            mask[:, 6:10] = 1 
+            return grad * mask 
+        policy.model.state_proj.weight.register_hook(mask_grad)
+
     for _ in range(step, cfg.steps):
         start_time = time.perf_counter()
         batch = next(dl_iter)
@@ -275,14 +270,17 @@ def train(cfg: TrainPipelineConfig):
         if cfg.freeze_except_7_10:
         # w1_6_means.append(output_dict["w_1_6_mean"])
             w7_10_means.append(output_dict["w_7_10_mean"])
+            w7_10_norms.append(output_dict["w_7_10_norm"])
             # w_all.append(output_dict["w_snapshot"])
 
         # Note: eval and checkpoint happens *after* the `step`th training update has completed, so we
         # increment `step` here.
         step += 1
+        # 打印7-10列的weight变化
         if step % 200 == 0 and cfg.freeze_except_7_10:
             w7_10_mean = output_dict["w_7_10_mean"]
-            print(f"Step {step}: state_proj 7–10 cols 均值= {w7_10_mean:.6f}")
+            w7_10_norm = output_dict["w_7_10_norm"]
+            print(f"Step {step}: state_proj 7–10 cols 均值= {w7_10_mean:.6f},norm={w7_10_norm}")
         train_tracker.step()
         is_log_step = cfg.log_freq > 0 and step % cfg.log_freq == 0
         is_saving_step = step % cfg.save_freq == 0 or step == cfg.steps
@@ -341,20 +339,23 @@ def train(cfg: TrainPipelineConfig):
     if eval_env:
         eval_env.close()
     logging.info("End of training")
-    if cfg.freeze_except_7_10:  
-
-    # if cfg.policy.push_to_hub:
+        # if cfg.policy.push_to_hub:
     #     policy.push_model_to_hub(cfg)
+    if cfg.freeze_except_7_10:  
         import matplotlib.pyplot as plt
         plt.plot(w7_10_means, label="Cols 7–10 Mean")
+        plt.plot(w7_10_norms, label="Cols 7–10 Norm")
+        plt.xlabel("Training Steps")
+        plt.ylabel("Value")
         plt.legend()
-        plt.savefig(f"state_proj_means_{cfg.add_location_to_state}.png", dpi=300)  # 保存到本地
-        plt.close()  # 关闭画布，避免内存泄漏
+        plt.savefig(f"state_proj_7_10_stats_{cfg.add_location_to_state}.png", dpi=300)
+        plt.close()
 
 
 def main():
     init_logging()
     train()
+
 
 if __name__ == "__main__":
     main()

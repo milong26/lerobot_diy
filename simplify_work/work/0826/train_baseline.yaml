@@ -1,0 +1,34 @@
+
+
+# nohup env CUDA_VISIBLE_DEVICES=0 HF_HUB_OFFLINE=1 PYTHONPATH=src   python -m lerobot.scripts.train   --config_path=simplify_work/work/0826/train_mstate_step1.yaml --policy.path=models/forsmolvla/smolvla_base > logs/0826/train_mstate_test_step1.log 2>&1 &
+
+
+dataset:
+  repo_id: lerobot/svla_so101_pickplace
+  root: training_dataset/0803_with_red/pickplace/first100
+
+batch_size: 64
+steps: 24000
+output_dir: outputs/train/0826/baseline
+job_name: baseline
+wandb:
+  enable: false
+
+policy:
+  device: cuda
+  repo_id: lerobot/smolvla_base
+  type: smolvla
+  push_to_hub: false
+  optimizer_lr: 1e-4
+
+# 自定义内容
+
+# 当空的时候就等于baseline
+# 会找数据集里面f"mtask_{self.language_tip_mode}.jsonl"的文件
+language_tip_mode: "" 
+# 控制是将location加到state里面
+add_location_to_state:  ""
+freeze_except_7_10: false
+
+# --policy.path=models/forsmolvla/smolvla_base
+# 用的代码是e7e433e

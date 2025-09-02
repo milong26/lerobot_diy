@@ -190,7 +190,7 @@ def get_logger(name: str, log_to_file: bool = True) -> logging.Logger:
     # Create logs directory if logging to file
     if log_to_file:
         os.makedirs("logs", exist_ok=True)
-        log_file = Path(f"logs/{name}_{int(time.time())}.log")
+        log_file = Path(f"logs/policy_server_log/{name}_{int(time.time())}.log")
     else:
         log_file = None
 
@@ -273,9 +273,6 @@ class RemotePolicyConfig:
     lerobot_features: dict[str, PolicyFeature]
     actions_per_chunk: int
     device: str = "cpu"
-    # 为了控制服务器是否修改task，默认为False
-    modify_task: bool = False
-    # 控制服务器是否使用depth
 
 
 def _compare_observation_states(obs1_state: torch.Tensor, obs2_state: torch.Tensor, atol: float) -> bool:
@@ -301,5 +298,3 @@ def observations_similar(
     )
 
     return _compare_observation_states(obs1_state, obs2_state, atol=atol)
-
-
