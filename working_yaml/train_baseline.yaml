@@ -1,0 +1,30 @@
+# 训练用的代码是错误的action_is_pad！
+# nohup env CUDA_VISIBLE_DEVICES=1 HF_HUB_OFFLINE=1 PYTHONPATH=src   python -m lerobot.scripts.train   --config_path=simplify_work/work/0829/train_mtask_5cm_with_wrong_action_pad.yaml --policy.path=models/forsmolvla/smolvla_base > logs/0829/train_mtask_5cm_wrong_pad.log 2>&1 &
+
+# 我想看看8/28训练出来的模型整体性能下降是什么原因造成的，难道就是那一个action_is_pad？因为对于mtask，确实只改了那一块儿，其它地方也没修改？
+
+dataset:
+  repo_id: lerobot/svla_so101_pickplace
+  root: training_dataset/831/sponge_pickup
+batch_size: 64
+steps: 26000
+output_dir: outputs/train/0902/baseline
+job_name: baseline_sponge_code_0902_10:54
+wandb:
+  enable: false
+
+policy:
+  device: cuda
+  repo_id: lerobot/smolvla_base
+  type: smolvla
+  push_to_hub: false
+  # optimizer_lr: 1e-4
+
+# 自定义内容
+
+# 当空的时候就等于baseline
+# 会找数据集里面f"mtask_{self.language_tip_mode}.jsonl"的文件
+language_tip_mode: "" 
+# 控制是将location加到state里面
+add_location_to_state:  ""
+freeze_except_7_10: false

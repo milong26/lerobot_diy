@@ -72,7 +72,6 @@ class SmolVLAConfig(PreTrainedConfig):
     train_state_proj: bool = True
 
     # Training presets
-    # 改变了这里
     optimizer_lr: float = 1e-4
     optimizer_betas: tuple[float, float] = (0.9, 0.95)
     optimizer_eps: float = 1e-8
@@ -86,13 +85,6 @@ class SmolVLAConfig(PreTrainedConfig):
     # vlm_model_name: str = "HuggingFaceTB/SmolVLM2-500M-Video-Instruct"  # Select the VLM backbone.
     # 直接把这个vlm_model_name改成local
     vlm_model_name: str = "models/forsmolvla/HuggingFaceTB/SmolVLM2-500M-Video-Instruct"
-    # 外部通知要不要加dim
-    # 训练和推理的时候都要用到
-    add_location_to_state: str=""
-
-
-    # 不方便直接下载所以改成path
-    # 目录在lerobot同级
     load_vlm_weights: bool = False  # Set to True in case of training the expert from scratch. True when init from pretrained SmolVLA weights
 
     add_image_special_tokens: bool = False  # Whether to use special image tokens around image features.
@@ -124,14 +116,6 @@ class SmolVLAConfig(PreTrainedConfig):
             raise NotImplementedError(
                 "`use_delta_joint_actions_aloha` is used by smolvla for aloha real models. It is not ported yet in LeRobot."
             )
-        # 检查backbone的目录对不对
-        # import os
-        # model_path = os.path.abspath(os.path.join("models/forsmolvla/", self.vlm_model_name))
-        # if os.path.isdir(model_path):
-        #     print("backbone local")
-        # else:
-        #     raise FileNotFoundError("backbone文件不在本地，建议先下载")
-        
 
     def validate_features(self) -> None:
         for i in range(self.empty_cameras):

@@ -233,7 +233,9 @@ def record_loop(
         if events["exit_early"]:
             events["exit_early"] = False
             break
+
         observation = robot.get_observation()
+
         if policy is not None or dataset is not None:
             observation_frame = build_dataset_frame(dataset.features, observation, prefix="observation")
 
@@ -268,7 +270,6 @@ def record_loop(
 
         # Action can eventually be clipped using `max_relative_target`,
         # so action actually sent is saved in the dataset.
-        
         sent_action = robot.send_action(action)
 
         if dataset is not None:
@@ -280,6 +281,7 @@ def record_loop(
             log_rerun_data(observation, action)
             
         # fps=30 in DatasetRecordConfig
+        # 
         dt_s = time.perf_counter() - start_loop_t
         busy_wait(1 / fps - dt_s)
 
@@ -342,6 +344,7 @@ def record(cfg: RecordConfig) -> LeRobotDataset:
         while recorded_episodes < cfg.dataset.num_episodes and not events["stop_recording"]:
             log_say(f"Recording episode {dataset.num_episodes}", cfg.play_sounds)
             # 如果用传感器就归零
+            # 暂时不用
             if cfg.robot.sensors:
                 robot.gui0sensor()
             record_loop(

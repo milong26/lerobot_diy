@@ -98,6 +98,8 @@ if IS_LOCAL:
 
 # Matches ".soNNN", optionally followed by "-something", up to the "_buffer_" marker
 _VARIANT_RE = re.compile(r"\.so\d+(?:-[\w]+)?_buffer_")
+
+
 def canonicalise(k: str) -> str:
     """
     Remove dataset-variant markers like '.so100-blue_' or '.so100_' from a
@@ -374,7 +376,6 @@ class SmolVLAPolicy(PreTrainedPolicy):
         self.language_tokenizer = AutoProcessor.from_pretrained(self.config.vlm_model_name, local_files_only=True).tokenizer
     
         self.model = VLAFlowMatching(config)
-        self.add_location_to_state=config.add_location_to_state
         self.reset()
 
 
@@ -404,7 +405,7 @@ class SmolVLAPolicy(PreTrainedPolicy):
     # 初始化，只会在训练的时候执行
     def init_new_state_proj_columns(self, old_in_features: int):
         print(f"初始化之前state_proj[0]的值",self.model.state_proj.weight[0,:],self.model.state_proj.bias[0])
-        if self.add_location_to_state and self.model.state_proj:
+        if self.model.state_proj:
             """只初始化 state_proj 的新增列"""
             import math
             fan_in = self.model.state_proj.in_features
@@ -463,18 +464,6 @@ class SmolVLAPolicy(PreTrainedPolicy):
     def _prepare_batch(self, batch: dict[str, Tensor]) -> dict[str, Tensor]:
         if self.config.adapt_to_pi_aloha:
             batch[OBS_STATE] = self._pi_aloha_decode_state(batch[OBS_STATE])
-        # # 推理之前也要处理normalize的，对于state的
-        # # 确保add_location_to_state有且add_state_dim对应
-        # if self.add_location_to_state:
-        #     adding_state_stat = {
-        #         "min": torch.tensor(self.add_state_dim["min"], dtype=torch.float32),
-        #         "max": torch.tensor(self.add_state_dim["max"], dtype=torch.float32),
-        #         "mean": torch.tensor(self.add_state_dim["mean"], dtype=torch.float32),
-        #         "std": torch.tensor(self.add_state_dim["std"], dtype=torch.float32),
-        #     }
-        # else:
-        #     adding_state_stat=None
-        # batch = self.normalize_inputs(batch,adding_state_stat)
         batch = self.normalize_inputs(batch)
 
         return batch
@@ -520,16 +509,15 @@ class SmolVLAPolicy(PreTrainedPolicy):
         if self.config.adapt_to_pi_aloha:
             batch[OBS_STATE] = self._pi_aloha_decode_state(batch[OBS_STATE])
             batch[ACTION] = self._pi_aloha_encode_actions_inv(batch[ACTION])
-        # 这一行之前居然没有加上？？？
         batch = self.normalize_inputs(batch)
         batch = self.normalize_targets(batch)
         images, img_masks = self.prepare_images(batch)
         state = self.prepare_state(batch)
         lang_tokens, lang_masks = self.prepare_language(batch)
         actions = self.prepare_action(batch)
-        # emm怎么说呢，纠结这里要不要改
-        actions_is_pad = batch.get("action_is_pad") 
-        # actions_is_pad = batch.get("actions_id_pad")
+        # 根据github勘误
+        # actions_is_pad = batch.get("action_is_pad") 
+        actions_is_pad = batch.get("actions_is_pad")
         loss_dict = {}
         losses = self.model.forward(images, img_masks, lang_tokens, lang_masks, state, actions, noise, time)
         # 检查验证 state_proj 的权重确实收到了梯度
@@ -608,14 +596,12 @@ class SmolVLAPolicy(PreTrainedPolicy):
 
         tasks = [task if task.endswith("\n") else f"{task}\n" for task in tasks]
 
-        # 以前是不加的，直到用了language，添加了一些语言
         """
         ValueError: Unable to create tensor, you should probably 
         activate truncation and/or padding with 'padding=True' 'truncation=True' 
         to have batched tensors with the same length. 
         Perhaps your features (`input_ids` in this case) have excessive nesting (inputs type `list` where type `int` is expected).
         """
-        # 用了strcutured之后报错说token数量不一致，有的65，有的66
         tokenized_prompt = self.language_tokenizer.__call__(
             tasks,
             padding=self.config.pad_language_to,
@@ -708,7 +694,7 @@ class VLAFlowMatching(nn.Module):
     │ |         │────► │Action│    │
     │ |   VLM   │cache │Expert│    |
     │ │         │────► |      │    │
-    │ │         │      │      │    │
+    │ │         │      │      │    │ 把state放在action expert的编码放在actionexpert里面会怎么样？以后尝试
     │ └▲──▲───▲─┘      └───▲──┘    |
     │  │  |   |            │       |
     │  |  |   |          noise     │
@@ -855,12 +841,11 @@ class VLAFlowMatching(nn.Module):
 
         num_lang_embs = lang_emb.shape[1]
         att_masks += [0] * num_lang_embs
-        # 状态嵌入，要改肯定改这里，如果要改的话还要加一个，self.config里面有吗？
+        # 状态嵌入
         # 可以用self.add_location_to_state（或者改成train_add_location_to_state）
         # 投影到self.vlm_with_expert.config.text_config.hidden_size对应的维数，把状态维度投影到 和语言/图像 token 相同的 hidden_size
         # 此时的state_embed变成e([64, 960])
         state_emb = self.state_proj(state)
-        # 如果只有2维？就加个维。这里也应该肯定是2d的吧
         # 此时变成了torch.Size([64, 1, 960])
         state_emb = state_emb[:, None, :] if state_emb.ndim == 2 else state_emb
         # 追加到总的embs,embs从（image_end_token，lang_emb）变成（image_end_token，lang_emb，state_emb）
@@ -868,7 +853,7 @@ class VLAFlowMatching(nn.Module):
         # bsize就是batchsize
         bsize = state_emb.shape[0]
         device = state_emb.device
-        # states_seq_len就是状态token的个数，为什么只是1？
+        # states_seq_len就是状态token的个数
         # 这个1表示每一个样本的state被当作一个token，而不是一个960维的长向量
         # 最终的输入序列会变成 一个batch里面样本 1: [ 图像token1, 图像token2, 语言token1, state_token ],...样本 64: [ 图像token1, 图像token2, 语言token1, state_token ]
         # 所以最终的输入序列是[64, seq_len, hidden_dim]

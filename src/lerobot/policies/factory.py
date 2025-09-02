@@ -135,6 +135,7 @@ def filter_meta_for_policy(ds_meta, exclude_features=None, state_dim=""):
 
         # new_stats["count"] = old_stats["count"]  # count 不变
         meta.stats["observation.state"] = new_stats
+        print("增加了meta里面state的min,max,mean,std")
 
     return meta
 
@@ -192,6 +193,7 @@ def make_policy(
             "observation.force_is_pad",
         ]
         # state_dim改成10维
+        print("训练时候之前的feature", ds_meta.features)
         meta_for_policy = filter_meta_for_policy(
             ds_meta,
             exclude_features=exclude_features,
@@ -199,6 +201,7 @@ def make_policy(
         )
         features = dataset_to_policy_features(meta_for_policy.features)
         kwargs["dataset_stats"] = meta_for_policy.stats
+        print("训练时候使用的feature",meta_for_policy.features)
     else:
         if not cfg.pretrained_path:
             logging.warning(

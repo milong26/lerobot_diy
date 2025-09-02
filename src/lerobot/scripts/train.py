@@ -82,6 +82,7 @@ def update_policy(
 
     # Unscale the gradient of the optimizer's assigned params in-place **prior to gradient clipping**.
     grad_scaler.unscale_(optimizer)
+
     grad_norm = torch.nn.utils.clip_grad_norm_(
         policy.parameters(),
         grad_clip_norm,
@@ -104,7 +105,6 @@ def update_policy(
             w_7_10 = w[:, 6:10] # shape [32, 4]
             output_dict["w_7_10_mean"] = w_7_10.mean().item()
             output_dict["w_7_10_norm"] = w_7_10.norm().item()
-
 
 
     # Step through pytorch scheduler at every batch instead of epoch
@@ -196,15 +196,11 @@ def train(cfg: TrainPipelineConfig):
         dataset,
         num_workers=cfg.num_workers,
         batch_size=cfg.batch_size,
-        shuffle=False,
+        shuffle=shuffle,
         sampler=sampler,
         pin_memory=device.type == "cuda",
         drop_last=False,
     )
-
-
-
-
 
         # 检查
     # peek_batch = next(iter(raw_dataloader))
@@ -212,7 +208,6 @@ def train(cfg: TrainPipelineConfig):
     # print("task示例",peek_batch["task"][0])
     # print("state示例",peek_batch["observation.state"][0])
     # raise KeyError("输出检查")
-
 
     # start train
     dl_iter = cycle(raw_dataloader)
@@ -360,6 +355,7 @@ def train(cfg: TrainPipelineConfig):
 def main():
     init_logging()
     train()
+
 
 if __name__ == "__main__":
     main()

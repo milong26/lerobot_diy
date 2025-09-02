@@ -196,7 +196,7 @@ class VisionProcessor:
                 
 
                 if self.language_tip_mode:
-                    if self.language_tip_mode == "relative":
+                    if self.language_tip_mode == "relative" or self.language_tip_mode == "relative_":
                         # 只有当两个点都存在，才计算相对坐标
                         if gripper_pos is not None and object_pos is not None:
                             dx = object_pos[0] - gripper_pos[0]
@@ -208,7 +208,7 @@ class VisionProcessor:
                             # 缺失任何一个，返回原始任务
                             task_str = task
 
-                    elif self.language_tip_mode == "grid_5cm":
+                    elif self.language_tip_mode == "grid_5cm" or self.language_tip_mode == "relative_grid":
                         if gripper_pos is not None and object_pos is not None:
                             dx = object_pos[0] - gripper_pos[0]
                             dy = object_pos[1] - gripper_pos[1]
