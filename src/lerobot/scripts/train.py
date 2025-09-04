@@ -97,7 +97,8 @@ class FilteredBatchLoader:
                 tasks = batch.get("task")
 
                 if images is not None and depths is not None and tasks is not None:
-                    new_tasks = self.obj_detector.add_depth_info_to_task(images, depths, tasks)
+                    # 需要手动修改
+                    new_tasks = self.obj_detector.add_depth_info_to_task(images, depths, tasks,["router","accessory"])
                     batch["task"] = new_tasks
 
                     if self.save_task_path:
@@ -266,7 +267,7 @@ def train(cfg: TrainPipelineConfig):
 
     # if cfg.use_language_tip:
     from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
-    obj_detector = VisionProcessor(language_tip_mode="before_train")
+    obj_detector = VisionProcessor(language_tip_mode="training")
 
     # 包装 dataloader
     dataloader = FilteredBatchLoader(raw_dataloader, exclude_features, obj_detector=obj_detector)

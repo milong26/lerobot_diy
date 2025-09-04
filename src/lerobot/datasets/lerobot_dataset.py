@@ -534,7 +534,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         # self.modified_tasks = load_modified_tasks("training_dataset/0803_with_red/pickplace/first100/meta/relative_task_grid.jsonl")
         self.modified_tasks=None
         # 训练的时候要用
-        if self.language_tip_mode:
+        if self.language_tip_mode and not self.language_tip_mode =="training":
             tip_filename = f"mtask_{self.language_tip_mode}.jsonl"
             tip_file = self.root / "meta" / tip_filename
             if not tip_file.exists():
@@ -862,7 +862,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         # Add task as a string
         # 原来准备用yolo的，0804重新采集数据之后可以用opencv直接定位了
         # 但是准确率不准，有缺失，训练数据还是用干净的比较好
-        if self.language_tip_mode:
+        if self.language_tip_mode and not self.language_tip_mode=="training":
             if not len(frame_idx) == 1:
                 raise ValueError("一次getitem应该只获取一个 frame")
             frame_idx = frame_idx[0]

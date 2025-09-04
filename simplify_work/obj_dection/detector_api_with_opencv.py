@@ -184,7 +184,6 @@ class VisionProcessor:
         # gripper 单独用红色检测
         # gripper_center, _ = self.opencv_detect_color(bgr_image, "gripper")
         gripper_center, _ = self.opencv_detect_red_gripper(bgr_image)
-        print("gripper的位置",gripper_center)
         results_2d["gripper"] = gripper_center
 
         # 其他颜色
@@ -211,21 +210,16 @@ class VisionProcessor:
 
 
         # 测试识别对不对
-        for name, center in results_2d.items():
-            if center is None:
-                continue
-            cx, cy = center
-            cv2.circle(bgr_image, (cx, cy), 10, (0, 255, 0), 2)  # 半径10圈
-            cv2.putText(bgr_image, name, (cx + 15, cy - 15),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+        # for name, center in results_2d.items():
+        #     if center is None:
+        #         continue
+        #     cx, cy = center
+        #     cv2.circle(bgr_image, (cx, cy), 10, (0, 255, 0), 2)  # 半径10圈
+        #     cv2.putText(bgr_image, name, (cx + 15, cy - 15),
+        #                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-            # 保存图片
-            cv2.imwrite("debug_first_detection.jpg", bgr_image)
-
-            # 打印3D坐标
-            print("=== 识别到的3D坐标 ===")
-            for k, v in threed_points.items():
-                print(k, ":", v)
+        #     # 保存图片
+        #     cv2.imwrite("debug_first_detection.jpg", bgr_image)
 
             # 强制退出
             # raise KeyError("Debug exit after saving first detection image.")
@@ -285,8 +279,10 @@ class VisionProcessor:
                     i += 1
                 else:
                     mapped[k] = None
-            print("对应",mapped)
-            raise KeyError("Debug exit after saving first detection image.")
+
+            # 测试识别能不能成功，计算位置对不对
+            # print("对应",mapped)
+            # raise KeyError("Debug exit after saving first detection image.")
 
             task_str = task  # 默认原始
 
