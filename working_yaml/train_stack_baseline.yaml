@@ -5,11 +5,11 @@
 
 dataset:
   repo_id: lerobot/svla_so101_pickplace
-  root: training_dataset/831/sponge_pickup
+  root: training_dataset/0902/stack
 batch_size: 64
 steps: 26000
-output_dir: outputs/train/0902/mtask_relative
-job_name: mtask_relative_sponge_code_0902_17:31
+output_dir: outputs/train/0903_stack/baseline
+job_name: baseline_sponge_code_0903_22:50
 wandb:
   enable: false
 
@@ -24,8 +24,7 @@ policy:
 
 # 当空的时候就等于baseline
 # 会找数据集里面f"mtask_{self.language_tip_mode}.jsonl"的文件
-language_tip_mode: "relative" 
+language_tip_mode: "" 
 # 控制是将location加到state里面
 add_location_to_state:  ""
 freeze_except_7_10: false
-

@@ -1,15 +1,14 @@
 # 训练用的代码是错误的action_is_pad！
 # nohup env CUDA_VISIBLE_DEVICES=1 HF_HUB_OFFLINE=1 PYTHONPATH=src   python -m lerobot.scripts.train   --config_path=simplify_work/work/0829/train_mtask_5cm_with_wrong_action_pad.yaml --policy.path=models/forsmolvla/smolvla_base > logs/0829/train_mtask_5cm_wrong_pad.log 2>&1 &
-
-# 我想看看8/28训练出来的模型整体性能下降是什么原因造成的，难道就是那一个action_is_pad？因为对于mtask，确实只改了那一块儿，其它地方也没修改？
+# 需要先运行假的train.py获得基础定位，然后再计算位置
 
 dataset:
   repo_id: lerobot/svla_so101_pickplace
-  root: training_dataset/831/sponge_pickup
+  root: training_dataset/0902/stack
 batch_size: 64
 steps: 26000
-output_dir: outputs/train/0902/mtask_relative
-job_name: mtask_relative_sponge_code_0902_17:31
+output_dir: outputs/train/0903_stack/mtask_relative
+job_name: baseline_sponge_code_0903_22:50
 wandb:
   enable: false
 
@@ -28,4 +27,3 @@ language_tip_mode: "relative"
 # 控制是将location加到state里面
 add_location_to_state:  ""
 freeze_except_7_10: false
-

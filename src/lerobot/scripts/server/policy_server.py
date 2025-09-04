@@ -366,7 +366,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         else:
             policy_image_features_to_use = self.policy_image_features
 
-        print("使用的 image feature:", policy_image_features_to_use)
+        # print("使用的 image feature:", policy_image_features_to_use)
 
         # 调用 raw_observation_to_observation
         observation: Observation = raw_observation_to_observation(

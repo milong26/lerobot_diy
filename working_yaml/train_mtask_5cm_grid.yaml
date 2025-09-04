@@ -8,8 +8,8 @@ dataset:
   root: training_dataset/831/sponge_pickup
 batch_size: 64
 steps: 26000
-output_dir: outputs/train/0902/mtask_relative
-job_name: mtask_relative_sponge_code_0902_10:54
+output_dir: outputs/train/0902/mtask_relative_5cm
+job_name: mtask_relative_sponge_code_0902_21:48
 wandb:
   enable: false
 
@@ -24,7 +24,7 @@ policy:
 
 # 当空的时候就等于baseline
 # 会找数据集里面f"mtask_{self.language_tip_mode}.jsonl"的文件
-language_tip_mode: "relative" 
+language_tip_mode: "relative_5cm" 
 # 控制是将location加到state里面
 add_location_to_state:  ""
 freeze_except_7_10: false

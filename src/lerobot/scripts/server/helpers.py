@@ -156,7 +156,13 @@ def prepare_raw_observation(
     lerobot_obs = make_lerobot_observation(robot_obs, lerobot_features)
 
     # 2. Greps all observation.images.<> keys
-    image_keys = list(filter(is_image_key, lerobot_obs))
+    # 在这里应该加一个过滤掉
+    image_keys = [
+        k for k in lerobot_obs.keys()
+        if is_image_key(k) and k in policy_image_features
+    ]
+    # image_keys = list(filter(is_image_key, lerobot_obs)) # 实际的，policy是模型的
+    
     # state's shape is expected as (B, state_dim)
     state_dict = {OBS_STATE: extract_state_from_raw_observation(lerobot_obs)}
     image_dict = {

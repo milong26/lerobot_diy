@@ -38,6 +38,48 @@ class VisionProcessor:
 
         # task处理的mode
         self.language_tip_mode=language_tip_mode
+        # 更改代码，适应更多颜色，红色不能用，蓝/黑尽量别用
+        # 用颜色提取器获取，需要适应颜色变换
+        self.color_ranges = {
+            "gripper": [(np.array([0, 70, 50]), np.array([10, 255, 255])),
+                    (np.array([170, 70, 50]), np.array([180, 255, 255]))],
+            "sponge": [(np.array([15, 30, 80]), np.array([45, 255, 255]))],
+            "sachet":[(np.array([15, 30, 80]), np.array([45, 255, 255]))],
+            "accessory": [(np.array([35, 50, 50]), np.array([85, 255, 255]))],
+            "router": [(np.array([90, 50, 50]), np.array([130, 255, 255]))],
+            "sticker": [(np.array([35, 50, 50]), np.array([85, 255, 255]))],
+        }
+
+    # 颜色检测函数，输入彩色图片和颜色名字，输出在彩色图片上的位置
+    def opencv_detect_color(self, color_image, color_name):
+        hsv = cv2.cvtColor(color_image, cv2.COLOR_BGR2HSV)
+        masks = []
+        if color_name not in self.color_ranges:
+            return None, None
+        for lower, upper in self.color_ranges[color_name]:
+            masks.append(cv2.inRange(hsv, lower, upper))
+        mask = masks[0]
+        for m in masks[1:]:
+            mask = cv2.bitwise_or(mask, m)
+
+        kernel = np.ones((5, 5), np.uint8)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        max_area = 0
+        best_contour = None
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if area > self.min_contour_area and area > max_area:
+                max_area = area
+                best_contour = cnt
+
+        if best_contour is not None:
+            bbox = cv2.boundingRect(best_contour)
+            return self._get_bbox_center(bbox), bbox
+        return None, None
 
     def _transform_image(self, image_tensor):
         if isinstance(image_tensor, torch.Tensor) and image_tensor.ndim == 4:
@@ -115,25 +157,42 @@ class VisionProcessor:
             bbox = cv2.boundingRect(best_contour)
             return self._get_bbox_center(bbox), bbox
         return None, None
-
+    
+    # 集中处理函数
     @torch.no_grad()
-    def process_sample(self, side_img, side_depth):
+    def process_sample(self, side_img, side_depth, colors_to_detect=None):
+        if colors_to_detect is None:
+            colors_to_detect = ["sponge"]  # 默认只检测 yellow
         image_tensor = self._transform_image(side_img)
         depth_tensor = self._transform_image(side_depth)
         bgr_image = cv2.cvtColor(image_tensor, cv2.COLOR_RGB2BGR)
 
-        gripper_center, _ = self.opencv_detect_red_gripper(bgr_image)
-        object_center, _ = self.opencv_detect_yellow_object(bgr_image)
+        results_2d = {}
+        # gripper 单独用红色检测
+        gripper_center, _ = self.opencv_detect_color(bgr_image, "gripper")
+        results_2d["gripper"] = gripper_center
 
+        # 其他颜色
+        for c in colors_to_detect:
+            center, _ = self.opencv_detect_color(bgr_image, c)
+            results_2d[c] = center
+
+        # 统计
         self.total_images += 1
-        if gripper_center is not None:
+        if results_2d["gripper"] is not None:
             self.gripper_detected += 1
-        if object_center is not None:
-            self.object_detected += 1
+        for c in colors_to_detect:
+            if results_2d[c] is not None:
+                self.object_detected += 1
 
-        centers = [pt for pt in [gripper_center, object_center] if pt is not None]
-        threed_pos = self.pixel_to_3d(depth_tensor, centers) if centers else [None, None]
-        return threed_pos
+        # 转3D
+        centers = {k: v for k, v in results_2d.items() if v is not None}
+        threed_points = {}
+        if centers:
+            points_3d = self.pixel_to_3d(depth_tensor, list(centers.values()))
+            for key, pt in zip(centers.keys(), points_3d):
+                threed_points[key] = pt
+        return threed_points
 
     def transform_camera_to_custom_coordsystem(self, points_3d):
         origin = np.array([0.24163092, -0.08227619, 0.60075652])
@@ -170,84 +229,71 @@ class VisionProcessor:
             avg_points.append(tuple(np.mean(pts, axis=0)) if pts else None)
         return avg_points
 
-    def add_depth_info_to_task(self, rgb_batch, depth_batch, task_batch):
+    def add_depth_info_to_task(self, rgb_batch, depth_batch, task_batch, colors_to_detect=None):
         updated_tasks = []
-
         for rgb, depth, task in zip(rgb_batch, depth_batch, task_batch):
-            points_3d = self.process_sample(rgb, depth)
-            task_str = task  # 默认原始 task
+            # 返回 dict, e.g. {"gripper": (x,y,z), "sachet": (..,..,..), ...}
+            points_3d_dict = self.process_sample(rgb, depth, colors_to_detect)
 
-            if points_3d and len(points_3d) >= 2:
-                converted_3d = self.transform_camera_to_custom_coordsystem(points_3d)
-                gripper_pos = converted_3d[0]
-                object_pos = converted_3d[1]
+            # 转换到自定义坐标系
+            valid_pts = [pt for pt in points_3d_dict.values() if pt is not None]
+            converted_pts = self.transform_camera_to_custom_coordsystem(valid_pts)
 
-                # 只有当 language_tip_mode 有值时才修改 task
-                if self.language_tip_mode:
-                    if self.language_tip_mode in ["relative", "relative_"]:
-                        if gripper_pos is not None and object_pos is not None:
-                            dx = object_pos[0] - gripper_pos[0]
-                            dy = object_pos[1] - gripper_pos[1]
-                            dz = object_pos[2] - gripper_pos[2]
-                            task_str = (f"{task}, sachet position relative to gripper is "
-                                        f"({dx:.3f}, {dy:.3f}, {dz:.3f})")
-                    elif self.language_tip_mode in ["grid_5cm", "relative_grid"]:
-                        if gripper_pos is not None and object_pos is not None:
-                            dx = object_pos[0] - gripper_pos[0]
-                            dy = object_pos[1] - gripper_pos[1]
-                            dz = object_pos[2] - gripper_pos[2]
-                            dx_grid = round(dx / 0.05)
-                            dy_grid = round(dy / 0.05)
-                            dz_grid = round(dz / 0.05)
-                            task_str = (f"{task}, sachet position relative to gripper is "
-                                        f"({dx_grid}, {dy_grid}, {dz_grid}) in 5cm grid units.")
-                    elif self.language_tip_mode == "grid_1cm":
-                        if gripper_pos is not None and object_pos is not None:
-                            dx = object_pos[0] - gripper_pos[0]
-                            dy = object_pos[1] - gripper_pos[1]
-                            dz = object_pos[2] - gripper_pos[2]
-                            dx_grid = round(dx / 0.01)
-                            dy_grid = round(dy / 0.01)
-                            dz_grid = round(dz / 0.01)
-                            task_str = (f"{task}, sachet position relative to gripper is "
-                                        f"({dx_grid}, {dy_grid}, {dz_grid}) in 1cm grid units.")
-                    elif self.language_tip_mode == "grid_2cm":
-                        if gripper_pos is not None and object_pos is not None:
-                            dx = object_pos[0] - gripper_pos[0]
-                            dy = object_pos[1] - gripper_pos[1]
-                            dz = object_pos[2] - gripper_pos[2]
-                            dx_grid = round(dx / 0.02)
-                            dy_grid = round(dy / 0.02)
-                            dz_grid = round(dz / 0.02)
-                            task_str = (f"{task}, sachet position relative to gripper is "
-                                        f"({dx_grid}, {dy_grid}, {dz_grid}) in 2cm grid units.")
-                    elif self.language_tip_mode == "structural":
-                        pass  # TODO: 结构化 prompt 自定义
+            # 映射回 key
+            mapped = {}
+            i = 0
+            for k, v in points_3d_dict.items():
+                if v is not None:
+                    mapped[k] = converted_pts[i]
+                    i += 1
+                else:
+                    mapped[k] = None
+
+            task_str = task  # 默认原始
+
+            if self.language_tip_mode:
+                mode = self.language_tip_mode.lower()
+
+                # === training 模式：输出所有目标的绝对位置 ===
+                if mode == "training":
+                    parts = [task]
+                    for name, pos in mapped.items():
+                        if pos is not None:
+                            parts.append(f"{name} at ({pos[0]:.3f}, {pos[1]:.3f}, {pos[2]:.3f})")
+                    task_str = " | ".join(parts)
+
+                # === relative / grid 模式：只拼接相对位置 ===
+                else:
+                    gripper_pos = mapped.get("gripper")
+                    if gripper_pos is None:
+                        # 没有 gripper，保持 task 不变
+                        task_str = task
                     else:
-                        # 未知的 language_tip_mode，拼接绝对坐标
-                        gripper_str = (
-                            f"({gripper_pos[0]:.3f}, {gripper_pos[1]:.3f}, {gripper_pos[2]:.3f})"
-                            if gripper_pos is not None else None
-                        )
-                        object_str = (
-                            f"({object_pos[0]:.3f}, {object_pos[1]:.3f}, {object_pos[2]:.3f})"
-                            if object_pos is not None else None
-                        )
-                        if gripper_str and object_str:
-                            task_str = f"{task} | gripper at {gripper_str}, sachet at {object_str}"
-                        elif gripper_str:
-                            task_str = f"{task} | gripper at {gripper_str}?"
-                        elif object_str:
-                            task_str = f"{task} | sachet at {object_str}?"
-                        else:
-                            task_str = f"{task} |?"
-                # 如果 language_tip_mode 为空，保持 task 原样
-            else:
-                task_str = f"{task} |?"
+                        rel_parts = []
+                        for obj_name, obj_pos in mapped.items():
+                            if obj_name == "gripper" or obj_pos is None:
+                                continue
+                            dx = obj_pos[0] - gripper_pos[0]
+                            dy = obj_pos[1] - gripper_pos[1]
+                            dz = obj_pos[2] - gripper_pos[2]
+
+                            # 选择单位
+                            if "5cm" in mode:
+                                dx, dy, dz = round(dx / 0.05), round(dy / 0.05), round(dz / 0.05)
+                                rel_parts.append(f"{obj_name} position relative to gripper is ({dx}, {dy}, {dz}) in 5cm grid units")
+                            elif "2cm" in mode:
+                                dx, dy, dz = round(dx / 0.02), round(dy / 0.02), round(dz / 0.02)
+                                rel_parts.append(f"{obj_name} position relative to gripper is ({dx}, {dy}, {dz}) in 2cm grid units")
+                            else:  # relative 模式
+                                rel_parts.append(f"{obj_name} position relative to gripper is ({dx:.3f}, {dy:.3f}, {dz:.3f})")
+
+                        if rel_parts:
+                            task_str = f"{task}, " + ", ".join(rel_parts)
 
             updated_tasks.append(task_str)
 
         return updated_tasks
+
 
 
 
