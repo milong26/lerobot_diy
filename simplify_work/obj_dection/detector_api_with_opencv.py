@@ -27,10 +27,11 @@ class VisionProcessor:
         self.lower_red2 = np.array([170, 70, 50])
         self.upper_red2 = np.array([180, 255, 255])
 
-        # 黄色识别 (物体)
-        self.lower_yellow = np.array([15, 30, 80])
-        self.upper_yellow = np.array([45, 255, 255])
+        # # 黄色识别 (物体)
+        # self.lower_yellow = np.array([15, 30, 80])
+        # self.upper_yellow = np.array([45, 255, 255])
         self.min_contour_area = 50
+        self.gripper_max_area = 200  # 根据实际 gripper 尺寸调节
 
         self.total_images = 0
         self.gripper_detected = 0
@@ -41,14 +42,25 @@ class VisionProcessor:
         # 更改代码，适应更多颜色，红色不能用，蓝/黑尽量别用
         # 用颜色提取器获取，需要适应颜色变换
         self.color_ranges = {
-            "gripper": [(np.array([0, 70, 50]), np.array([10, 255, 255])),
-                    (np.array([170, 70, 50]), np.array([180, 255, 255]))],
-            "sponge": [(np.array([15, 30, 80]), np.array([45, 255, 255]))],
-            "sachet":[(np.array([15, 30, 80]), np.array([45, 255, 255]))],
-            "accessory": [(np.array([35, 50, 50]), np.array([85, 255, 255]))],
-            "router": [(np.array([90, 50, 50]), np.array([130, 255, 255]))],
-            "sticker": [(np.array([35, 50, 50]), np.array([85, 255, 255]))],
+            # Gripper: 深色，饱和度高，Hue 在 92–97
+            # "gripper": [(np.array([90, 60, 50]), np.array([100, 130, 150]))],
+
+            # Sponge: 蓝绿色，Hue 22–24，S 很高
+            "sponge": [(np.array([20, 120, 100]), np.array([26, 255, 255]))],
+
+            # Sachet: 灰蓝色，Hue 15–28，和 sponge 还是能区分开
+            "sachet": [(np.array([15, 50, 60]), np.array([28, 130, 170]))],
+
+            # Accessory: 浅灰绿，Hue 35–49
+            "accessory": [(np.array([35, 15, 100]), np.array([50, 60, 230]))],
+
+            # Router: 浅灰白，Hue 100–104，S 和 V 都比较高
+            "router": [(np.array([98, 45, 200]), np.array([106, 70, 230]))],
+
+            # Sticker: 蓝灰色，Hue 21–35，低饱和，高亮度
+            "sticker": [(np.array([20, 20, 190]), np.array([36, 60, 230]))],
         }
+
 
     # 颜色检测函数，输入彩色图片和颜色名字，输出在彩色图片上的位置
     def opencv_detect_color(self, color_image, color_name):
@@ -135,30 +147,31 @@ class VisionProcessor:
             return self._get_bbox_center(bbox), bbox
         return None, None
 
-    def opencv_detect_yellow_object(self, color_image):
-        hsv = cv2.cvtColor(color_image, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, self.lower_yellow, self.upper_yellow)
+    # def opencv_detect_yellow_object(self, color_image):
+    #     hsv = cv2.cvtColor(color_image, cv2.COLOR_BGR2HSV)
+    #     mask = cv2.inRange(hsv, self.lower_yellow, self.upper_yellow)
 
-        kernel = np.ones((5, 5), np.uint8)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+    #     kernel = np.ones((5, 5), np.uint8)
+    #     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    #     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    #     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        max_area = 0
-        best_contour = None
-        for cnt in contours:
-            area = cv2.contourArea(cnt)
-            if area > self.min_contour_area and area > max_area:
-                max_area = area
-                best_contour = cnt
+    #     max_area = 0
+    #     best_contour = None
+    #     for cnt in contours:
+    #         area = cv2.contourArea(cnt)
+    #         if area > self.min_contour_area and area > max_area:
+    #             max_area = area
+    #             best_contour = cnt
 
-        if best_contour is not None:
-            bbox = cv2.boundingRect(best_contour)
-            return self._get_bbox_center(bbox), bbox
-        return None, None
+    #     if best_contour is not None:
+    #         bbox = cv2.boundingRect(best_contour)
+    #         return self._get_bbox_center(bbox), bbox
+    #     return None, None
     
     # 集中处理函数
+    # 默认返回的只有3d的了
     @torch.no_grad()
     def process_sample(self, side_img, side_depth, colors_to_detect=None):
         if colors_to_detect is None:
@@ -169,7 +182,9 @@ class VisionProcessor:
 
         results_2d = {}
         # gripper 单独用红色检测
-        gripper_center, _ = self.opencv_detect_color(bgr_image, "gripper")
+        # gripper_center, _ = self.opencv_detect_color(bgr_image, "gripper")
+        gripper_center, _ = self.opencv_detect_red_gripper(bgr_image)
+        print("gripper的位置",gripper_center)
         results_2d["gripper"] = gripper_center
 
         # 其他颜色
@@ -192,6 +207,28 @@ class VisionProcessor:
             points_3d = self.pixel_to_3d(depth_tensor, list(centers.values()))
             for key, pt in zip(centers.keys(), points_3d):
                 threed_points[key] = pt
+
+
+
+        # 测试识别对不对
+        for name, center in results_2d.items():
+            if center is None:
+                continue
+            cx, cy = center
+            cv2.circle(bgr_image, (cx, cy), 10, (0, 255, 0), 2)  # 半径10圈
+            cv2.putText(bgr_image, name, (cx + 15, cy - 15),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+            # 保存图片
+            cv2.imwrite("debug_first_detection.jpg", bgr_image)
+
+            # 打印3D坐标
+            print("=== 识别到的3D坐标 ===")
+            for k, v in threed_points.items():
+                print(k, ":", v)
+
+            # 强制退出
+            # raise KeyError("Debug exit after saving first detection image.")
         return threed_points
 
     def transform_camera_to_custom_coordsystem(self, points_3d):
@@ -248,6 +285,8 @@ class VisionProcessor:
                     i += 1
                 else:
                     mapped[k] = None
+            print("对应",mapped)
+            raise KeyError("Debug exit after saving first detection image.")
 
             task_str = task  # 默认原始
 
@@ -291,6 +330,7 @@ class VisionProcessor:
                             task_str = f"{task}, " + ", ".join(rel_parts)
 
             updated_tasks.append(task_str)
+            
 
         return updated_tasks
 
