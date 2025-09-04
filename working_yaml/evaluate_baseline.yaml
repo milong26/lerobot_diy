@@ -20,13 +20,13 @@ robot:
       use_depth: true
     wrist:
       type: opencv
-      index_or_path: 6
+      index_or_path: 1
       width: 640
       height: 480
       fps: 30
 
-task: "pick up a yellow sponge sachet and place it into the box"
-
+task: "Pick up a yellow sponge and place it inside the box"
+pretrained_name_or_path: outputs/train/0902/baseline/checkpoints/026000/pretrained_model
 policy_type: smolvla
 policy_device: cuda
 actions_per_chunk: 50

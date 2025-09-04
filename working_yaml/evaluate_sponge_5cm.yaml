@@ -25,12 +25,10 @@ robot:
       height: 480
       fps: 30
 
-task: "pick up the pyramid-shaped sachet and place it into the box"
-
+task: "Pick up a yellow sponge and place it inside the box"
+pretrained_name_or_path: outputs/train/0902/mtask_relative_5cm/checkpoints/026000/pretrained_model
 policy_type: smolvla
-# POLICY: the model name/path on server to the checkpoint to run (e.g., lerobot/smolvla_base)
-pretrained_name_or_path: outputs/train/0829/mtask_grid_5cm/checkpoints/026000/pretrained_model
-policy_device: cpu
+policy_device: cuda
 actions_per_chunk: 50
 
 chunk_size_threshold: 0.5
