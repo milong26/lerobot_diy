@@ -51,6 +51,7 @@ from lerobot.utils.utils import (
     init_logging,
 )
 from lerobot.utils.wandb_utils import WandBLogger
+from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
 
 # https://github.com/huggingface/lerobot/issues/1377
 import os
@@ -69,11 +70,9 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import json
 from pathlib import Path
 
-import json
-from pathlib import Path
 
 class FilteredBatchLoader:
-    def __init__(self, dataloader, exclude_keys: list, obj_detector=None, save_task_path='modified_tasks_pure.jsonl'):
+    def __init__(self, dataloader, exclude_keys: list, obj_detector:VisionProcessor=None, save_task_path='modified_tasks_pure.jsonl'):
         self.dataloader = dataloader
         self.exclude_keys = set(exclude_keys)
         self.obj_detector = obj_detector
@@ -98,7 +97,7 @@ class FilteredBatchLoader:
 
                 if images is not None and depths is not None and tasks is not None:
                     # 需要手动修改
-                    new_tasks = self.obj_detector.add_depth_info_to_task(images, depths, tasks,["router","accessory"])
+                    new_tasks = self.obj_detector.add_depth_info_to_task(images, depths, tasks,["router","sticker"])
                     batch["task"] = new_tasks
 
                     if self.save_task_path:
@@ -266,7 +265,7 @@ def train(cfg: TrainPipelineConfig):
     # obj_detector = None
 
     # if cfg.use_language_tip:
-    from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
+    
     obj_detector = VisionProcessor(language_tip_mode="training")
 
     # 包装 dataloader
