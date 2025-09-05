@@ -1,0 +1,46 @@
+Traceback (most recent call last):
+  File "/home/zhonglinyue/miniconda3/envs/lerobot/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/home/zhonglinyue/miniconda3/envs/lerobot/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/home/zhonglinyue/code/lerobot_diy/src/lerobot/scripts/train.py", line 361, in <module>
+    main()
+  File "/home/zhonglinyue/code/lerobot_diy/src/lerobot/scripts/train.py", line 357, in main
+    train()
+  File "/home/zhonglinyue/code/lerobot_diy/src/lerobot/configs/parser.py", line 224, in wrapper_inner
+    cfg = draccus.parse(config_class=argtype, config_path=config_path, args=cli_args)
+  File "/home/zhonglinyue/miniconda3/envs/lerobot/lib/python3.10/site-packages/draccus/argparsing.py", line 204, in parse
+    parser = ArgumentParser(
+  File "/home/zhonglinyue/miniconda3/envs/lerobot/lib/python3.10/site-packages/draccus/argparsing.py", line 73, in __init__
+    self._set_dataclass(config_class)  # type: ignore
+  File "/home/zhonglinyue/miniconda3/envs/lerobot/lib/python3.10/site-packages/draccus/argparsing.py", line 87, in _set_dataclass
+    new_wrapper.register_actions(parser=self.parser)
+  File "/home/zhonglinyue/miniconda3/envs/lerobot/lib/python3.10/site-packages/draccus/wrappers/dataclass_wrapper.py", line 69, in register_actions
+    child.register_actions(parser)
+  File "/home/zhonglinyue/miniconda3/envs/lerobot/lib/python3.10/site-packages/draccus/wrappers/choice_wrapper.py", line 208, in register_actions
+    child.register_actions(parser)
+  File "/home/zhonglinyue/miniconda3/envs/lerobot/lib/python3.10/site-packages/draccus/wrappers/choice_wrapper.py", line 83, in register_actions
+    child.register_actions(parser)
+  File "/home/zhonglinyue/miniconda3/envs/lerobot/lib/python3.10/site-packages/draccus/wrappers/dataclass_wrapper.py", line 71, in register_actions
+    child.add_action(group)
+  File "/home/zhonglinyue/miniconda3/envs/lerobot/lib/python3.10/site-packages/draccus/wrappers/field_wrapper.py", line 309, in add_action
+    logger.debug(f"Arg options for field '{self.name}': {self.arg_options}")
+  File "/home/zhonglinyue/miniconda3/envs/lerobot/lib/python3.10/site-packages/draccus/wrappers/field_wrapper.py", line 85, in arg_options
+    options = self.get_arg_options()
+  File "/home/zhonglinyue/miniconda3/envs/lerobot/lib/python3.10/site-packages/draccus/wrappers/field_wrapper.py", line 111, in get_arg_options
+    if self.help:
+  File "/home/zhonglinyue/miniconda3/envs/lerobot/lib/python3.10/site-packages/draccus/wrappers/field_wrapper.py", line 258, in help
+    self._docstring = docstring.get_attribute_docstring(self.parent.dataclass, self.field.name)
+  File "/home/zhonglinyue/miniconda3/envs/lerobot/lib/python3.10/site-packages/draccus/wrappers/docstring.py", line 97, in get_attribute_docstring
+    return get_attribute_docstring(base_class, field_name)
+  File "/home/zhonglinyue/miniconda3/envs/lerobot/lib/python3.10/site-packages/draccus/wrappers/docstring.py", line 63, in get_attribute_docstring
+    source = inspect.getsource(some_dataclass)
+  File "/home/zhonglinyue/miniconda3/envs/lerobot/lib/python3.10/inspect.py", line 1139, in getsource
+    lines, lnum = getsourcelines(object)
+  File "/home/zhonglinyue/miniconda3/envs/lerobot/lib/python3.10/inspect.py", line 1131, in getsourcelines
+    return getblock(lines[lnum:]), lnum + 1
+  File "/home/zhonglinyue/miniconda3/envs/lerobot/lib/python3.10/inspect.py", line 1107, in getblock
+    blockfinder.tokeneater(*_token)
+  File "/home/zhonglinyue/miniconda3/envs/lerobot/lib/python3.10/inspect.py", line 1058, in tokeneater
+    def tokeneater(self, type, token, srowcol, erowcol, line):
+KeyboardInterrupt

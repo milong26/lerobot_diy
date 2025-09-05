@@ -438,7 +438,6 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             task_batch = [task]
 
             tasks=self.obj_detector.add_depth_info_to_task(colored_image,depth_image,task_batch,objects)
-            print("返回的tasks",tasks)
             task=tasks[0]
             observation["task"]=task
         self.logger.info(f'mtask修改obs.task内容变成：{observation["task"]}')
