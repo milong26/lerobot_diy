@@ -35,7 +35,7 @@ class VisionProcessor:
 
         self.total_images = 0
         self.gripper_detected = 0
-        self.object_detected = 0
+        self.object_detected = {}  # 改成字典
 
         # task处理的mode
         self.language_tip_mode=language_tip_mode
@@ -57,7 +57,7 @@ class VisionProcessor:
             # Router: 浅灰白，Hue 100–104，S 和 V 都比较高
             "router": [(np.array([98, 45, 200]), np.array([106, 70, 230]))],
 
-            # Sticker: 蓝灰色，Hue 21–35，低饱和，高亮度
+            # Sticker: 黄色，Hue 21–35，低饱和，高亮度
             "sticker": [(np.array([20, 20, 190]), np.array([36, 60, 230]))],
         }
 
@@ -175,6 +175,7 @@ class VisionProcessor:
     @torch.no_grad()
     def process_sample(self, side_img, side_depth, colors_to_detect=None):
         if colors_to_detect is None:
+            raise ValueError("至少要检测一个物体")
             colors_to_detect = ["sponge"]  # 默认只检测 yellow
         image_tensor = self._transform_image(side_img)
         depth_tensor = self._transform_image(side_depth)
@@ -182,7 +183,6 @@ class VisionProcessor:
 
         results_2d = {}
         # gripper 单独用红色检测
-        # gripper_center, _ = self.opencv_detect_color(bgr_image, "gripper")
         gripper_center, _ = self.opencv_detect_red_gripper(bgr_image)
         results_2d["gripper"] = gripper_center
 
@@ -196,8 +196,10 @@ class VisionProcessor:
         if results_2d["gripper"] is not None:
             self.gripper_detected += 1
         for c in colors_to_detect:
+            if c not in self.object_detected:
+                self.object_detected[c] = 0
             if results_2d[c] is not None:
-                self.object_detected += 1
+                self.object_detected[c] += 1
 
         # 转3D
         centers = {k: v for k, v in results_2d.items() if v is not None}
@@ -260,7 +262,7 @@ class VisionProcessor:
             avg_points.append(tuple(np.mean(pts, axis=0)) if pts else None)
         return avg_points
 
-    def add_depth_info_to_task(self, rgb_batch, depth_batch, task_batch, colors_to_detect=None):
+    def add_depth_info_to_task(self, rgb_batch, depth_batch, task_batch, colors_to_detect=[]):
         updated_tasks = []
         for rgb, depth, task in zip(rgb_batch, depth_batch, task_batch):
             # 返回 dict, e.g. {"gripper": (x,y,z), "sachet": (..,..,..), ...}
@@ -397,14 +399,19 @@ class VisionProcessor:
                 distances.append(0)
 
         return distances[0] if is_single else distances
-
+    # 对每个object类别分别计算
     def print_statistics(self):
         if self.total_images == 0:
             print("尚未处理任何图像。")
             return
-        if self.total_images % 1000 == 0:
+
+        if self.total_images % 100 == 0:
             gripper_rate = self.gripper_detected / self.total_images * 100
-            object_rate = self.object_detected / self.total_images * 100
             print(f"总图像数: {self.total_images}")
             print(f"Gripper 检测成功率: {gripper_rate:.2f}% ({self.gripper_detected}/{self.total_images})")
-            print(f"Object 检测成功率: {object_rate:.2f}% ({self.object_detected}/{self.total_images})")
+
+            # 逐类输出 object 检测成功率
+            for obj_name, detected_count in self.object_detected.items():
+                rate = detected_count / self.total_images * 100
+                print(f"{obj_name} 检测成功率: {rate:.2f}% ({detected_count}/{self.total_images})")
+
