@@ -163,7 +163,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         # 根据模型的路径选择合适的modify_task策略
         model_path = policy_specs.pretrained_name_or_path
         model_dirname = Path(model_path).parts  # or use Path(model_path).name for last part
-        model_name=exp_name = str(model_dirname[3])
+        model_name= str(model_dirname[3])
 
         # 处理三种模型：baseline，mtask，mstate
         self.obj_detector = None
@@ -433,8 +433,11 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             task=observation["task"]
             colored_image=observation["observation.images.side"]
             depth_image=observation["observation.images.side_depth"]
+            object_keywords = ["sponge", "sachet", "accessory", "router", "sticker"]
+            objects = [obj for obj in object_keywords if obj in task.lower()]
             task_batch = [task]
-            tasks=self.obj_detector.add_depth_info_to_task(colored_image,depth_image,task_batch)
+
+            tasks=self.obj_detector.add_depth_info_to_task(colored_image,depth_image,task_batch,objects)
             print("返回的tasks",tasks)
             task=tasks[0]
             observation["task"]=task

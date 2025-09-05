@@ -262,7 +262,7 @@ class VisionProcessor:
             avg_points.append(tuple(np.mean(pts, axis=0)) if pts else None)
         return avg_points
 
-    def add_depth_info_to_task(self, rgb_batch, depth_batch, task_batch, colors_to_detect=None):
+    def add_depth_info_to_task(self, rgb_batch, depth_batch, task_batch, colors_to_detect=[]):
         updated_tasks = []
         for rgb, depth, task in zip(rgb_batch, depth_batch, task_batch):
             # 返回 dict, e.g. {"gripper": (x,y,z), "sachet": (..,..,..), ...}
