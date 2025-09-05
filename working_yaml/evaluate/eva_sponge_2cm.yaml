@@ -26,7 +26,7 @@ robot:
       fps: 30
 
 task: "Pick up a yellow sponge and place it inside the box"
-pretrained_name_or_path: outputs/train/0902sponge/baseline/checkpoints/026000/pretrained_model
+pretrained_name_or_path: outputs/train/0902sponge/mtask_relative_2cm/checkpoints/026000/pretrained_model
 policy_type: smolvla
 policy_device: cuda
 actions_per_chunk: 50

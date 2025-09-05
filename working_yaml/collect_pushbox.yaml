@@ -15,7 +15,7 @@ robot:
       use_depth: true
     wrist:
       type: opencv
-      index_or_path: 1
+      index_or_path: 0
       width: 640
       height: 480
       fps: 30
@@ -35,11 +35,12 @@ teleop:
 display_data: false
 
 dataset:
-  repo_id: 903/push_accessory
-  num_episodes: 50
-  single_task: "Push the blue router into position over the white area"
-  episode_time_s: 30
+  repo_id: 903/push_router
+  num_episodes: 12
+  single_task: "Push the blue router to sticker"
+  episode_time_s: 40
   push_to_hub: false
   reset_time_s: 2
 
-# resume: True 
+resume: True 
+
