@@ -531,7 +531,7 @@ class RobotClient:
 
             # 更新距离
             # print(observation.observation)
-            self.latest_distance=self.obj_detector.count_distance(color_image,depth_image)
+            # self.latest_distance=self.obj_detector.count_distance(color_image,depth_image)
             obs_capture_time = time.perf_counter() - start_time
 
             # If there are no actions left in the queue, the observation must go through processing!
