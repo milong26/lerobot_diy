@@ -433,7 +433,8 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             task=observation["task"]
             colored_image=observation["observation.images.side"]
             depth_image=observation["observation.images.side_depth"]
-            object_keywords = ["sponge", "sachet", "accessory", "router", "sticker"]
+            # object_keywords = ["sponge", "sachet", "accessory", "router", "sticker","black"]
+            object_keywords = ["sponge", "sachet", "accessory","sticker","black"]
             objects = [obj for obj in object_keywords if obj in task.lower()]
             task_batch = [task]
 

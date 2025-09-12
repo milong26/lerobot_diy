@@ -30,7 +30,7 @@ class VisionProcessor:
         # # 黄色识别 (物体)
         # self.lower_yellow = np.array([15, 30, 80])
         # self.upper_yellow = np.array([45, 255, 255])
-        self.min_contour_area = 50
+        self.min_contour_area = 10
         self.gripper_max_area = 200  # 根据实际 gripper 尺寸调节
 
         self.total_images = 0
@@ -58,7 +58,13 @@ class VisionProcessor:
             "router": [(np.array([98, 45, 200]), np.array([106, 70, 230]))],
 
             # Sticker: 黄色，Hue 21–35，低饱和，高亮度
-            "sticker": [(np.array([20, 20, 190]), np.array([36, 60, 230]))],
+            # "sticker": [(np.array([20, 20, 190]), np.array([36, 60, 230]))],
+            "sticker": [(np.array([15, 20, 60]), np.array([36, 130, 230]))],
+
+            "tape": [(np.array([15, 50, 60]), np.array([28, 130, 170]))],
+            "green": [(np.array([50, 50, 50]), np.array([90, 255, 255]))],        # 绿色范围示例
+            "grey": [(np.array([100, 10, 60]), np.array([130, 80, 200]))],
+            "black": [(np.array([100, 100, 80]), np.array([108, 255, 210]))],
         }
 
 
@@ -94,29 +100,30 @@ class VisionProcessor:
         return None, None
 
     def _transform_image(self, image_tensor):
-        if isinstance(image_tensor, torch.Tensor) and image_tensor.ndim == 4:
-        # [B, C, H, W] -> [C, H, W]
-            image_tensor = image_tensor[0]
-        if isinstance(image_tensor, torch.Tensor):
-            image_np = (image_tensor.permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
-        elif isinstance(image_tensor, np.ndarray):
-            if image_tensor.ndim == 3:
-                # 如果是 [H, W, C]，直接用
-                if image_tensor.shape[2] == 3:
-                    image_np = image_tensor.astype(np.uint8)
-                # 如果是 [C, H, W]，先转换
-                elif image_tensor.shape[0] == 3:
-                    image_np = np.transpose(image_tensor, (1, 2, 0)).astype(np.uint8)
-                else:
-                    raise ValueError(f"Unsupported numpy image shape: {image_tensor.shape}")
-            elif image_tensor.ndim == 4:
-                # [1, C, H, W] 或 [1, H, W, C]
+        with torch.no_grad():
+            if isinstance(image_tensor, torch.Tensor) and image_tensor.ndim == 4:
+            # [B, C, H, W] -> [C, H, W]
                 image_tensor = image_tensor[0]
-                return self._transform_image(image_tensor)
-            else:
-                raise ValueError(f"Unsupported numpy image dimensions: {image_tensor.ndim}")
+            if isinstance(image_tensor, torch.Tensor):
+                image_np = (image_tensor.permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
+            elif isinstance(image_tensor, np.ndarray):
+                if image_tensor.ndim == 3:
+                    # 如果是 [H, W, C]，直接用
+                    if image_tensor.shape[2] == 3:
+                        image_np = image_tensor.astype(np.uint8)
+                    # 如果是 [C, H, W]，先转换
+                    elif image_tensor.shape[0] == 3:
+                        image_np = np.transpose(image_tensor, (1, 2, 0)).astype(np.uint8)
+                    else:
+                        raise ValueError(f"Unsupported numpy image shape: {image_tensor.shape}")
+                elif image_tensor.ndim == 4:
+                    # [1, C, H, W] 或 [1, H, W, C]
+                    image_tensor = image_tensor[0]
+                    return self._transform_image(image_tensor)
+                else:
+                    raise ValueError(f"Unsupported numpy image dimensions: {image_tensor.ndim}")
 
-        return image_np
+            return image_np
 
     def _get_bbox_center(self, bbox):
         x, y, w, h = bbox
@@ -332,6 +339,97 @@ class VisionProcessor:
 
         return updated_tasks
 
+    # new_tasks = self.obj_detector.add_2d_position_to_task(images,tasks,["grey","green"],state)
+    # 处理仿真环境，没有gripper，用state代替
+    def add_2d_position_to_task(self, rgb_batch, task_batch, state_batch, colors_to_detect=[]):
+        # 初始化统计字典（如果还没有）
+        if not hasattr(self, "total_images"):
+            self.total_images = 0
+            self.gripper_detected = 0
+            self.object_detected = {c: 0 for c in colors_to_detect}
+
+        updated_tasks = []
+
+        for idx, (rgb, task, gripper_pos) in enumerate(zip(rgb_batch, task_batch, state_batch)):
+            self.total_images += 1  # 每张图都计数
+
+            # 转换为 BGR 以便 OpenCV 处理
+            image_np = self._transform_image(rgb)
+            bgr_image = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+
+            # 检测其他颜色目标
+            results_2d = {}
+            # 检测每种颜色，只保留最大的一个色块
+            for c in colors_to_detect:
+                center, bbox = self.opencv_detect_color(bgr_image, c)
+                if center is not None:
+                    x, y = center
+                    # === 对 green / grey 做缩放 ===
+                    # if c in ["green", "grey"]:
+                    #     scale = 512 / 96
+                    #     x = round(x * scale)
+                    #     y = round(y * scale)
+                    results_2d[c] = (x, y)
+                    # 更新统计
+                    self.object_detected[c] = self.object_detected.get(c, 0) + 1
+                else:
+                    results_2d[c] = None
+
+            if gripper_pos is not None:
+                if isinstance(gripper_pos, torch.Tensor):
+                    gripper_pos = gripper_pos.squeeze().cpu().numpy()  # shape (2,)
+                self.gripper_detected += 1  # gripper 检测成功计数
+
+            task_str = task  # 默认保持不变
+
+            if self.language_tip_mode:
+                mode = self.language_tip_mode.lower()
+
+                # === training 模式：输出绝对像素位置 ===
+                if mode == "training":
+                    parts = [task]
+                    # 添加 gripper 位置
+                    if gripper_pos is not None:
+                        parts.append(f"gripper at pixel ({int(gripper_pos[0])}, {int(gripper_pos[1])})")
+                    for name, pos in results_2d.items():
+                        if pos is not None:
+                            parts.append(f"{name} at pixel ({int(pos[0])}, {int(pos[1])})")
+                    task_str = " | ".join(parts)
+
+                # === relative / grid 模式：输出相对 gripper 的像素差 ===
+                else:
+                    if gripper_pos is None:
+                        task_str = task
+                    else:
+                        rel_parts = []
+                        gx, gy = gripper_pos
+                        for obj_name, obj_pos in results_2d.items():
+                            if obj_pos is None:
+                                continue
+                            dx = obj_pos[0] - gx
+                            dy = obj_pos[1] - gy
+
+
+                            if "10pixel" in mode:
+                                dx, dy = int(round(dx / 10)), int(round(dy / 10))
+                                rel_parts.append(
+                                    f"{obj_name} relative to gripper is ({int(dx)}, {int(dy)}) in 10px grid unit"
+                                )
+                            elif "30pixel" in mode:
+                                dx, dy = int(round(dx / 30)), int(round(dy / 30))
+                                rel_parts.append(
+                                    f"{obj_name} relative to gripper is ({int(dx)}, {int(dy)}) in 30pixel grid unit"
+                                )
+                            else:  # 普通 relative
+                                rel_parts.append(
+                                    f"{obj_name} relative to gripper is ({int(dx)}, {int(dy)})"
+                                )
+
+                        if rel_parts:
+                            task_str = f"{task}, " + ", ".join(rel_parts)
+            updated_tasks.append(task_str)
+
+        return updated_tasks
 
 
 

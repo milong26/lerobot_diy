@@ -91,13 +91,26 @@ class FilteredBatchLoader:
         for batch in self.dataloader:
             # Step 1: apply obj_detector before excluding keys
             if self.obj_detector is not None:
+                states=batch.get("observation.state").cpu()
+                # 仿真环境才有
+                # images=batch.get("observation.image").cpu()
+                # 现实环境有两个
                 images = batch.get("observation.images.side").cpu()
                 depths = batch.get("observation.images.side_depth").cpu()
                 tasks = batch.get("task")
 
-                if images is not None and depths is not None and tasks is not None:
+                # if images is not None and depths is not None and tasks is not None:
+                if images is not None and  tasks is not None:
                     # 需要手动修改
+
+
+                    # 这个是给真实的
                     new_tasks = self.obj_detector.add_depth_info_to_task(images, depths, tasks,["router","sticker"])
+
+                    # 给仿真环境的
+                    # new_tasks = self.obj_detector.add_2d_position_to_task(images,tasks,states,["router","sticker"],)
+
+
                     batch["task"] = new_tasks
 
                     if self.save_task_path:
@@ -305,7 +318,7 @@ def train(cfg: TrainPipelineConfig):
         if ep_indices is not None:
                 ep_np = ep_indices.cpu().numpy() if isinstance(ep_indices, torch.Tensor) else ep_indices
 
-                if not seen_99 and 99 in ep_np:
+                if not seen_99 and 149 in ep_np:
                     seen_99 = True  # 第一次遇到99
                     print("第一次遇到 episode_index=99，开始关注后续的0")
 

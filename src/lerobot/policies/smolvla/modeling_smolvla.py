@@ -597,7 +597,7 @@ class SmolVLAPolicy(PreTrainedPolicy):
         tasks = [task if task.endswith("\n") else f"{task}\n" for task in tasks]
         # for i, task in enumerate(tasks):
         #     token_ids = self.language_tokenizer(task)['input_ids']
-        #     print(f"[DEBUG] Sample {i},task:{task}: token length = {len(token_ids)}")
+        #     print(f"[检查] Sample {i},task:{task}: token length = {len(token_ids)}")
         """
         ValueError: Unable to create tensor, you should probably 
         activate truncation and/or padding with 'padding=True' 'truncation=True' 

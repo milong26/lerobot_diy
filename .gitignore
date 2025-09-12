@@ -177,3 +177,6 @@ outputs/
 # 模型和数据
 training_dataset/
 models/
+for_pusht/mytrain_result_final/
+for_pusht/train/
+for_pusht/mytrain_result/

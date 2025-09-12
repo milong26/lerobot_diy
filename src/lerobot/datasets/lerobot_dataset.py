@@ -841,9 +841,21 @@ class LeRobotDataset(torch.utils.data.Dataset):
             
         # 每个episode开始的第一帧的query_indices
         episode_start_idx = self.episode_start_indices[ep_idx]
-        frame_idx = [
-            i - episode_start_idx for i in query_indices['observation.images.side']
-        ]
+        # 找到可用的 image key
+        image_key = None
+        for k in ["observation.images.side", "observation.image"]:
+            if k in query_indices:
+                image_key = k
+                break
+
+        if image_key is None:
+            raise KeyError(f"query_indices 里没有可用的图像 key: {list(query_indices.keys())}")
+
+        frame_idx = [i - episode_start_idx for i in query_indices[image_key]]
+
+        # frame_idx = [
+        #     i - episode_start_idx for i in query_indices['observation.images.side']
+        # ]
         # frame_idx=frame_idx[0]
         if len(self.meta.video_keys) > 0:
             current_ts = item["timestamp"].item()
