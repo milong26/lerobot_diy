@@ -1,7 +1,9 @@
 from pathlib import Path
 
 import gym_pusht  # noqa: F401
+print(gym_pusht.__path__)
 import gymnasium as gym
+print(gym.__path__)
 import imageio
 import numpy
 import torch
@@ -57,7 +59,7 @@ print("output_feature: ")
 print(policy.config.output_features)
 print(env.action_space)
 #===========================================
-obj_detector= VisionProcessor(language_tip_mode="relative")
+obj_detector= VisionProcessor(language_tip_mode="")
 
 ##==================评估=====================
 # 运行的轮数(评估次数)
@@ -92,7 +94,7 @@ with open(results_file, "w") as f:
         print(f"Starting rollout {i + 1}/{num_rollouts}")
         # Reset the policy and environments to prepare for rollout
         policy.reset()
-        numpy_observation, info = env.reset()
+        numpy_observation, info = env.reset(seed=42)
 
         # Prepare to collect every rewards and all the frames of the episode,
         # from initial state to final state.

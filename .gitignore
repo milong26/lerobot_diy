@@ -180,3 +180,12 @@ models/
 for_pusht/mytrain_result_final/
 for_pusht/train/
 for_pusht/mytrain_result/
+*.png
+*.mp4
+*.safetensors
+train_config.json
+optimizer_param_groups.json
+training_steps.json
+config.json
+scheduler_state.json
+training_step.json

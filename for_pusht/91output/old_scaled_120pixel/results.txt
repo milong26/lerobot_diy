@@ -1,0 +1,16 @@
+Rollout Results (Total: 100)
+==================================================
+Rollout 0: Success! Total reward: 489.3789068927818
+Rollout 1: Success! Total reward: 94.19516592573588
+Rollout 2: Failure! Total reward: 178.75977641084603
+Rollout 3: Failure! Total reward: 56.974388689558964
+Rollout 4: Failure! Total reward: 500.5133729493362
+Rollout 5: Failure! Total reward: 191.68941008325194
+Rollout 6: Failure! Total reward: 163.77755661759204
+Rollout 7: Success! Total reward: 129.77944337112632
+Rollout 8: Success! Total reward: 371.3451495996552
+Rollout 9: Success! Total reward: 309.4080534669278
+Rollout 10: Failure! Total reward: 0.0
+Rollout 11: Failure! Total reward: 4.569483899622782
+Rollout 12: Failure! Total reward: 506.2808776518212
+Rollout 13: Failure! Total reward: 450.2783110818176

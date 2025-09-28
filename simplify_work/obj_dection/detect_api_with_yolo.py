@@ -23,11 +23,15 @@ depth_scale = 0.0010000000474974513
 class YOLOProcessor:
     def __init__(self, 
                  model_path="yolo/training/runs/train/yolo11nano_custom2/weights/best.pt",  # 使用微调后的YOLO模型
-                 device="cuda" if torch.cuda.is_available() else "cpu"):
+                 device="cuda" if torch.cuda.is_available() else "cpu",
+                 language_tip_mode=None):
         self.device = device
         self.model = YOLO(model_path).to(self.device)  # 加载YOLO模型
         self.fail_counter = 0
-        self.class_names = {0: "gripper"}  # 只需要夹子的类别定义
+        self.class_names = {
+            0: "gripper",
+            1: ""
+            }  # 只需要夹子的类别定义
         self.conf_threshold = 0.25  # 置信度阈值
         
         # 淡黄色物体的HSV颜色范围
@@ -150,16 +154,16 @@ class YOLOProcessor:
         if centers:
             threed_pos = self.pixel_to_3d(depth_tensor, centers)
 
-        """
-        测试center是否正确
-        """
-
-        # 仅调试用：可视化检测点并保存图像
+        # """
+        # 测试center是否正确
+        # """
+        # debug_vis = depth_tensor.copy()
+        # # 仅调试用：可视化检测点并保存图像
         # if gripper_center is not None:
         #     cv2.circle(debug_vis, gripper_center, 8, (0, 255, 0), -1)  # green
         # if object_center is not None:
         #     cv2.circle(debug_vis, object_center, 8, (0, 0, 255), -1)  # red
-        # debug_vis = depth_tensor.copy()
+
         # debug_save_path='outputs/depth'
         # cv2.imwrite(debug_save_path, depth_tensor)
 
@@ -238,8 +242,7 @@ class YOLOProcessor:
         return avg_points
 
         
-    def add_depth_info_to_task(self, rgb_batch, depth_batch, task_batch):
-
+    def add_depth_info_to_task(self, rgb_batch, depth_batch, task_batch,objects=None):
 
         rgb_batch = rgb_batch.to(self.device)
         depth_batch = depth_batch.to(self.device)
@@ -256,6 +259,7 @@ class YOLOProcessor:
 
             # 获取两个目标的3D坐标(相机坐标系)
             points_3d = self.process_sample(rgb, depth)
+            print("得到两个目标的信息")
 
         
             if points_3d and len(points_3d) >= 2:

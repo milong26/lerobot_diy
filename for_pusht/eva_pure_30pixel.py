@@ -11,7 +11,7 @@ import sys
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-print("路径",)
+
 from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
 
 ##===================环境准备====================
@@ -20,7 +20,7 @@ from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
 # baseline的测试
 # output_directory = Path("for_pusht/mytrain_result_400time/baseline") 
 # relative的测试
-output_directory = Path("for_pusht/mytrain_result_final/relative") 
+output_directory = Path("for_pusht/result/pure_30pixel") 
 output_directory.mkdir(parents=True, exist_ok=True)
 
 # Select your device
@@ -30,8 +30,9 @@ device = "cuda"
 # OR a path to a local outputs/train folder.
 # 选择模型文件夹(我也用的绝对路径)
 # pretrained_policy_path = Path("for_pusht/train/checkpoints/last/pretrained_model")
-# pretrained_policy_path = Path("for_pusht/train/baseline/checkpoints/026000/pretrained_model")
-pretrained_policy_path = Path("for_pusht/train/relative/checkpoints/026000/pretrained_model")
+pretrained_policy_path = Path("for_pusht/train_just/mtask_30pixel/checkpoints/026000/pretrained_model")
+# pretrained_policy_path = Path("for_pusht/train_zuihou/mtask_relative/checkpoints/026000/pretrained_model")
+
 policy = SmolVLAPolicy.from_pretrained(pretrained_policy_path)
 
 # Initialize evaluation environment to render two observation types:
@@ -57,7 +58,7 @@ print("output_feature: ")
 print(policy.config.output_features)
 print(env.action_space)
 #===========================================
-obj_detector= VisionProcessor(language_tip_mode="relative")
+obj_detector= VisionProcessor(language_tip_mode="30pixel")
 
 ##==================评估=====================
 # 运行的轮数(评估次数)
@@ -92,7 +93,7 @@ with open(results_file, "w") as f:
         print(f"Starting rollout {i + 1}/{num_rollouts}")
         # Reset the policy and environments to prepare for rollout
         policy.reset()
-        numpy_observation, info = env.reset(seed=42)
+        numpy_observation, info = env.reset()
 
         # Prepare to collect every rewards and all the frames of the episode,
         # from initial state to final state.
@@ -126,7 +127,7 @@ with open(results_file, "w") as f:
             # relative
             new_tasks = obj_detector.add_2d_position_to_task(image,task,state,["grey","green"],)
             new_task=new_tasks[0]
-            # print(new_task)
+            # print("啊",new_task)
             # baseline
             # new_task=task[0]
             # Send data tensors from CPU to GPU

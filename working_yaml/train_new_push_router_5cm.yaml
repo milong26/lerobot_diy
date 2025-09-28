@@ -8,8 +8,8 @@ dataset:
   root: training_dataset/0905/push
 batch_size: 64
 steps: 26000
-output_dir: outputs/train/0912_push/mtask_2cm
-job_name: baseline_push_code_0912_total_150data_2cm
+output_dir: outputs/train/0912_push/mtask_5cm
+job_name: baseline_push_code_0912_total_150data_5cm
 wandb:
   enable: false
 

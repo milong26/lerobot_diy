@@ -517,6 +517,7 @@ class SmolVLAPolicy(PreTrainedPolicy):
         actions = self.prepare_action(batch)
         # 根据github勘误
         # actions_is_pad = batch.get("action_is_pad") 
+        # 暂时还是用正确的比较好
         actions_is_pad = batch.get("actions_is_pad")
         loss_dict = {}
         losses = self.model.forward(images, img_masks, lang_tokens, lang_masks, state, actions, noise, time)
@@ -804,6 +805,7 @@ class VLAFlowMatching(nn.Module):
                 embs.append(image_start_token)
                 pad_masks.append(image_start_mask)
             # 真正的图像处理
+            # 需要调用smolvlm_with_expert
             img_emb = self.vlm_with_expert.embed_image(img)
             img_emb = img_emb
 

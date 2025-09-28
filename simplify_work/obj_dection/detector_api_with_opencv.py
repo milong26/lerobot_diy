@@ -36,6 +36,7 @@ class VisionProcessor:
         self.total_images = 0
         self.gripper_detected = 0
         self.object_detected = {}  # 改成字典
+        self.green_default = (46.0, 50.0)
 
         # task处理的mode
         self.language_tip_mode=language_tip_mode
@@ -347,7 +348,7 @@ class VisionProcessor:
             self.total_images = 0
             self.gripper_detected = 0
             self.object_detected = {c: 0 for c in colors_to_detect}
-
+  
         updated_tasks = []
 
         for idx, (rgb, task, gripper_pos) in enumerate(zip(rgb_batch, task_batch, state_batch)):
@@ -365,15 +366,23 @@ class VisionProcessor:
                 if center is not None:
                     x, y = center
                     # === 对 green / grey 做缩放 ===
-                    # if c in ["green", "grey"]:
-                    #     scale = 512 / 96
-                    #     x = round(x * scale)
-                    #     y = round(y * scale)
-                    results_2d[c] = (x, y)
+                    if c in ["green", "grey"]:
+                        scale = 512 / 96
+                        x = round(x * scale)
+                        y = round(y * scale)
+                        results_2d[c] = (x, y)
                     # 更新统计
                     self.object_detected[c] = self.object_detected.get(c, 0) + 1
                 else:
-                    results_2d[c] = None
+                    if c == "green":
+                        (x,y) = self.green_default
+                        scale = 512 / 96
+                        x = round(x * scale)
+                        y = round(y * scale)
+                        results_2d[c] = (x, y)
+                    else:
+                        raise KeyError("2d环境不可能没识别到")
+                        results_2d[c] = None
 
             if gripper_pos is not None:
                 if isinstance(gripper_pos, torch.Tensor):
@@ -403,6 +412,9 @@ class VisionProcessor:
                     else:
                         rel_parts = []
                         gx, gy = gripper_pos
+                        # 新的scale方式，放缩到96里面
+                        # new_type_scale=96/512
+                        # gx, gy = round(gx*new_type_scale),round(gy*new_type_scale)
                         for obj_name, obj_pos in results_2d.items():
                             if obj_pos is None:
                                 continue
@@ -413,16 +425,44 @@ class VisionProcessor:
                             if "10pixel" in mode:
                                 dx, dy = int(round(dx / 10)), int(round(dy / 10))
                                 rel_parts.append(
-                                    f"{obj_name} relative to gripper is ({int(dx)}, {int(dy)}) in 10px grid unit"
+                                    # f"{obj_name} relative to gripper is ({int(dx)}, {int(dy)}) in 10px grid unit"
+                                    f"{obj_name} position relative to gripper is ({int(dx)}, {int(dy)})"
                                 )
                             elif "30pixel" in mode:
                                 dx, dy = int(round(dx / 30)), int(round(dy / 30))
                                 rel_parts.append(
-                                    f"{obj_name} relative to gripper is ({int(dx)}, {int(dy)}) in 30pixel grid unit"
+                                    f"{obj_name} position relative to gripper is ({int(dx)}, {int(dy)}) in 30pixel grid unit"
+                                    # f"{obj_name} relative to gripper is ({int(dx)}, {int(dy)})"
                                 )
-                            else:  # 普通 relative
+                            elif "2pixel" in mode:
+                                dx, dy = int(round(dx / 2)), int(round(dy / 2))
                                 rel_parts.append(
-                                    f"{obj_name} relative to gripper is ({int(dx)}, {int(dy)})"
+                                    f"{obj_name} position relative to gripper is ({int(dx)}, {int(dy)}) in 2 pixel unit"
+                                    # f"{obj_name} relative to gripper is ({int(dx)}, {int(dy)})"
+                                )
+                            elif "5pixel" in mode:
+                                dx, dy = int(round(dx / 5)), int(round(dy / 5))
+                                # rel_parts.append(
+                                #     f"{obj_name} position relative to gripper is ({int(dx)}, {int(dy)}) in 5 pixel unit"
+                                #     # f"{obj_name} relative to gripper is ({int(dx)}, {int(dy)})"
+                                # )
+                                dx_str = f"{int(dx):03d}"
+                                dy_str = f"{int(dy):03d}"
+                                
+                                rel_parts.append(
+                                    f"{obj_name} position relative to gripper is ({dx_str}, {dy_str}) in 2 pixel unit"
+                                )
+                            elif "120pixel" in mode:
+                                dx, dy = int(round(dx / 120)), int(round(dy / 120))
+                                rel_parts.append(
+                                    f"{obj_name} position relative to gripper is ({dx}, {dy}) in 120 pixel unit"
+                                )
+                            else:
+                                  # 普通 relative
+                                dx_str = f"{int(dx):03d}"
+                                dy_str = f"{int(dy):03d}"
+                                rel_parts.append(
+                                    f"{obj_name} position relative to gripper is ({dx_str}, {dy_str})"
                                 )
 
                         if rel_parts:

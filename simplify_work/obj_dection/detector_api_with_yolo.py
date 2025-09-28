@@ -238,7 +238,7 @@ class YOLOProcessor:
         return avg_points
 
         
-    def add_depth_info_to_task(self, rgb_batch, depth_batch, task_batch):
+    def add_depth_info_to_task(self, rgb_batch, depth_batch, task_batch,objects=None):
 
 
         rgb_batch = rgb_batch.to(self.device)

@@ -1,3 +1,4 @@
+# 测试scaled_relative，如果成功率很低的话，那就是不能用relative做
 from pathlib import Path
 
 import gym_pusht  # noqa: F401
@@ -11,16 +12,17 @@ import sys
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-print("路径",)
+
 from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
 
 ##===================环境准备====================
 #输出目录，用来保存输出(我用的绝对路径)
 # output_directory = Path("for_pusht/relative/output")
 # baseline的测试
-# output_directory = Path("for_pusht/mytrain_result_400time/baseline") 
+# raise KeyError("没改")
+output_directory = Path("for_pusht/output_just/10pixel") 
 # relative的测试
-output_directory = Path("for_pusht/mytrain_result_final/relative") 
+# output_directory = Path("for_pusht/mytrain_result_400time/relative") 
 output_directory.mkdir(parents=True, exist_ok=True)
 
 # Select your device
@@ -30,8 +32,9 @@ device = "cuda"
 # OR a path to a local outputs/train folder.
 # 选择模型文件夹(我也用的绝对路径)
 # pretrained_policy_path = Path("for_pusht/train/checkpoints/last/pretrained_model")
-# pretrained_policy_path = Path("for_pusht/train/baseline/checkpoints/026000/pretrained_model")
-pretrained_policy_path = Path("for_pusht/train/relative/checkpoints/026000/pretrained_model")
+# raise KeyError("没改")
+pretrained_policy_path = Path("for_pusht/train_just_0915/mtask_10pixel/checkpoints/026000/pretrained_model")
+# pretrained_policy_path = Path("for_pusht/train/relative/checkpoints/026000/pretrained_model")
 policy = SmolVLAPolicy.from_pretrained(pretrained_policy_path)
 
 # Initialize evaluation environment to render two observation types:
@@ -57,7 +60,8 @@ print("output_feature: ")
 print(policy.config.output_features)
 print(env.action_space)
 #===========================================
-obj_detector= VisionProcessor(language_tip_mode="relative")
+# raise KeyError("没改")
+obj_detector= VisionProcessor(language_tip_mode="10pixel")
 
 ##==================评估=====================
 # 运行的轮数(评估次数)
@@ -83,6 +87,7 @@ with open(results_file, "w") as f:
     # 成功和失败计数
     success_count = 0
     failure_count = 0
+    printed_task=False
 
 
 
@@ -92,7 +97,7 @@ with open(results_file, "w") as f:
         print(f"Starting rollout {i + 1}/{num_rollouts}")
         # Reset the policy and environments to prepare for rollout
         policy.reset()
-        numpy_observation, info = env.reset(seed=42)
+        numpy_observation, info = env.reset()
 
         # Prepare to collect every rewards and all the frames of the episode,
         # from initial state to final state.
@@ -104,6 +109,7 @@ with open(results_file, "w") as f:
 
         step = 0
         done = False
+        
 
         while not done:
             # Prepare observation for the policy running in Pytorch
@@ -125,10 +131,13 @@ with open(results_file, "w") as f:
 
             # relative
             new_tasks = obj_detector.add_2d_position_to_task(image,task,state,["grey","green"],)
-            new_task=new_tasks[0]
-            # print(new_task)
+            # new_task=new_tasks[0]
             # baseline
-            # new_task=task[0]
+            new_task=new_tasks[0]
+            if not printed_task:   # 第一次打印
+                print("啊", new_task)
+                printed_task = True
+            # print("啊",new_task)
             # Send data tensors from CPU to GPU
             state = state.to(device, non_blocking=True)
             image = image.to(device, non_blocking=True)
@@ -139,6 +148,7 @@ with open(results_file, "w") as f:
                 "observation.image": image,
                 "task": [new_task],
             }
+
             # Predict the next action with respect to the current observation
             with torch.inference_mode():
                 action = policy.select_action(observation)

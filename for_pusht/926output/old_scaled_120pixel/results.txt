@@ -1,0 +1,210 @@
+Rollout Results (Total: 100)
+==================================================
+Rollout 0: avg img_proc=0.66 ms, avg infer=12.11 ms
+Rollout 0: Failure! Total reward: 704.6505121735014
+Rollout 1: avg img_proc=0.67 ms, avg infer=11.54 ms
+Rollout 1: Failure! Total reward: 561.3769673127644
+Rollout 2: avg img_proc=0.66 ms, avg infer=11.90 ms
+Rollout 2: Success! Total reward: 188.0576924577195
+Rollout 3: avg img_proc=0.64 ms, avg infer=10.57 ms
+Rollout 3: Failure! Total reward: 272.21128975097554
+Rollout 4: avg img_proc=0.90 ms, avg infer=14.05 ms
+Rollout 4: Success! Total reward: 128.59706834153394
+Rollout 5: avg img_proc=0.83 ms, avg infer=14.98 ms
+Rollout 5: Success! Total reward: 75.55642994053639
+Rollout 6: avg img_proc=0.68 ms, avg infer=10.93 ms
+Rollout 6: Failure! Total reward: 438.3072466087206
+Rollout 7: avg img_proc=0.67 ms, avg infer=11.55 ms
+Rollout 7: Failure! Total reward: 309.5285621002496
+Rollout 8: avg img_proc=0.65 ms, avg infer=10.65 ms
+Rollout 8: Failure! Total reward: 450.6703360267512
+Rollout 9: avg img_proc=0.52 ms, avg infer=9.86 ms
+Rollout 9: Failure! Total reward: 49.796153004433165
+Rollout 10: avg img_proc=0.50 ms, avg infer=10.03 ms
+Rollout 10: Success! Total reward: 161.06446158697807
+Rollout 11: avg img_proc=0.44 ms, avg infer=9.42 ms
+Rollout 11: Success! Total reward: 324.8167626616477
+Rollout 12: avg img_proc=0.83 ms, avg infer=12.47 ms
+Rollout 12: Failure! Total reward: 353.8737359381714
+Rollout 13: avg img_proc=0.67 ms, avg infer=10.78 ms
+Rollout 13: Failure! Total reward: 1.1368681039819724
+Rollout 14: avg img_proc=0.65 ms, avg infer=10.83 ms
+Rollout 14: Failure! Total reward: 0.3976429756827292
+Rollout 15: avg img_proc=0.63 ms, avg infer=10.70 ms
+Rollout 15: Failure! Total reward: 413.84605667853776
+Rollout 16: avg img_proc=1.20 ms, avg infer=19.00 ms
+Rollout 16: Failure! Total reward: 485.05178946265664
+Rollout 17: avg img_proc=0.98 ms, avg infer=15.34 ms
+Rollout 17: Failure! Total reward: 5.253738719122905
+Rollout 18: avg img_proc=1.05 ms, avg infer=16.29 ms
+Rollout 18: Failure! Total reward: 0.0
+Rollout 19: avg img_proc=1.28 ms, avg infer=22.44 ms
+Rollout 19: Success! Total reward: 323.4264983523927
+Rollout 20: avg img_proc=1.28 ms, avg infer=20.85 ms
+Rollout 20: Failure! Total reward: 1.5724338420494934
+Rollout 21: avg img_proc=1.36 ms, avg infer=21.04 ms
+Rollout 21: Failure! Total reward: 192.33941828982148
+Rollout 22: avg img_proc=1.18 ms, avg infer=20.43 ms
+Rollout 22: Success! Total reward: 264.70293525985176
+Rollout 23: avg img_proc=1.35 ms, avg infer=22.16 ms
+Rollout 23: Success! Total reward: 393.533604761721
+Rollout 24: avg img_proc=1.35 ms, avg infer=23.15 ms
+Rollout 24: Failure! Total reward: 357.8546694525609
+Rollout 25: avg img_proc=1.40 ms, avg infer=21.70 ms
+Rollout 25: Failure! Total reward: 47.31687192841324
+Rollout 26: avg img_proc=1.29 ms, avg infer=20.07 ms
+Rollout 26: Failure! Total reward: 0.2678108194708196
+Rollout 27: avg img_proc=1.28 ms, avg infer=20.63 ms
+Rollout 27: Failure! Total reward: 0.0
+Rollout 28: avg img_proc=1.22 ms, avg infer=20.46 ms
+Rollout 28: Failure! Total reward: 366.018443245404
+Rollout 29: avg img_proc=1.10 ms, avg infer=17.32 ms
+Rollout 29: Failure! Total reward: 30.23520349555384
+Rollout 30: avg img_proc=1.10 ms, avg infer=17.91 ms
+Rollout 30: Success! Total reward: 200.8177546195402
+Rollout 31: avg img_proc=1.07 ms, avg infer=16.20 ms
+Rollout 31: Success! Total reward: 182.46618516841835
+Rollout 32: avg img_proc=1.04 ms, avg infer=17.79 ms
+Rollout 32: Failure! Total reward: 0.04757530460561521
+Rollout 33: avg img_proc=1.08 ms, avg infer=17.76 ms
+Rollout 33: Failure! Total reward: 315.7037608335747
+Rollout 34: avg img_proc=1.14 ms, avg infer=18.79 ms
+Rollout 34: Failure! Total reward: 615.9763875648268
+Rollout 35: avg img_proc=1.17 ms, avg infer=17.34 ms
+Rollout 35: Failure! Total reward: 417.6903814267051
+Rollout 36: avg img_proc=1.20 ms, avg infer=19.12 ms
+Rollout 36: Failure! Total reward: 7.569392886200026
+Rollout 37: avg img_proc=1.23 ms, avg infer=18.52 ms
+Rollout 37: Failure! Total reward: 417.6526019827573
+Rollout 38: avg img_proc=1.25 ms, avg infer=19.94 ms
+Rollout 38: Failure! Total reward: 0.0
+Rollout 39: avg img_proc=1.23 ms, avg infer=19.86 ms
+Rollout 39: Failure! Total reward: 1.1363323910340344
+Rollout 40: avg img_proc=1.16 ms, avg infer=19.33 ms
+Rollout 40: Failure! Total reward: 455.8124470961903
+Rollout 41: avg img_proc=1.06 ms, avg infer=16.66 ms
+Rollout 41: Failure! Total reward: 49.12504200774498
+Rollout 42: avg img_proc=1.12 ms, avg infer=18.24 ms
+Rollout 42: Failure! Total reward: 1.4245392791706581
+Rollout 43: avg img_proc=1.34 ms, avg infer=20.33 ms
+Rollout 43: Success! Total reward: 312.5689712867781
+Rollout 44: avg img_proc=1.42 ms, avg infer=24.38 ms
+Rollout 44: Failure! Total reward: 469.3093508891333
+Rollout 45: avg img_proc=1.35 ms, avg infer=22.24 ms
+Rollout 45: Failure! Total reward: 0.0
+Rollout 46: avg img_proc=1.35 ms, avg infer=23.88 ms
+Rollout 46: Failure! Total reward: 1.1731323563878233
+Rollout 47: avg img_proc=1.32 ms, avg infer=20.79 ms
+Rollout 47: Failure! Total reward: 0.0
+Rollout 48: avg img_proc=1.33 ms, avg infer=21.50 ms
+Rollout 48: Failure! Total reward: 186.9123491071921
+Rollout 49: avg img_proc=1.23 ms, avg infer=19.73 ms
+Rollout 49: Failure! Total reward: 497.53774322009866
+Rollout 50: avg img_proc=1.22 ms, avg infer=19.96 ms
+Rollout 50: Failure! Total reward: 642.6541454168364
+Rollout 51: avg img_proc=1.19 ms, avg infer=19.53 ms
+Rollout 51: Failure! Total reward: 0.0
+Rollout 52: avg img_proc=1.23 ms, avg infer=18.74 ms
+Rollout 52: Failure! Total reward: 0.38184932417205253
+Rollout 53: avg img_proc=1.17 ms, avg infer=19.14 ms
+Rollout 53: Success! Total reward: 145.98697031386567
+Rollout 54: avg img_proc=1.05 ms, avg infer=15.51 ms
+Rollout 54: Failure! Total reward: 509.7176694556485
+Rollout 55: avg img_proc=1.15 ms, avg infer=17.97 ms
+Rollout 55: Failure! Total reward: 0.0
+Rollout 56: avg img_proc=1.05 ms, avg infer=17.35 ms
+Rollout 56: Failure! Total reward: 517.6683104861023
+Rollout 57: avg img_proc=0.99 ms, avg infer=18.82 ms
+Rollout 57: Success! Total reward: 75.326784020374
+Rollout 58: avg img_proc=1.18 ms, avg infer=18.17 ms
+Rollout 58: Failure! Total reward: 1.4056100987390563
+Rollout 59: avg img_proc=1.11 ms, avg infer=17.21 ms
+Rollout 59: Failure! Total reward: 369.40350315269336
+Rollout 60: avg img_proc=1.09 ms, avg infer=17.38 ms
+Rollout 60: Failure! Total reward: 618.9303366581023
+Rollout 61: avg img_proc=1.29 ms, avg infer=20.84 ms
+Rollout 61: Failure! Total reward: 613.3173626128304
+Rollout 62: avg img_proc=1.17 ms, avg infer=19.94 ms
+Rollout 62: Failure! Total reward: 5.923149268066286
+Rollout 63: avg img_proc=1.05 ms, avg infer=18.07 ms
+Rollout 63: Success! Total reward: 130.37689014868266
+Rollout 64: avg img_proc=1.10 ms, avg infer=18.15 ms
+Rollout 64: Success! Total reward: 388.7284224696333
+Rollout 65: avg img_proc=1.11 ms, avg infer=17.62 ms
+Rollout 65: Failure! Total reward: 24.5819360712241
+Rollout 66: avg img_proc=0.78 ms, avg infer=12.56 ms
+Rollout 66: Failure! Total reward: 713.7937364591234
+Rollout 67: avg img_proc=0.90 ms, avg infer=14.10 ms
+Rollout 67: Failure! Total reward: 6.707189271555665
+Rollout 68: avg img_proc=1.06 ms, avg infer=18.53 ms
+Rollout 68: Failure! Total reward: 0.855345438965818
+Rollout 69: avg img_proc=1.03 ms, avg infer=17.29 ms
+Rollout 69: Failure! Total reward: 275.17884083600933
+Rollout 70: avg img_proc=1.20 ms, avg infer=19.93 ms
+Rollout 70: Failure! Total reward: 567.0826412265387
+Rollout 71: avg img_proc=1.25 ms, avg infer=20.91 ms
+Rollout 71: Failure! Total reward: 456.9711632341559
+Rollout 72: avg img_proc=1.26 ms, avg infer=21.34 ms
+Rollout 72: Failure! Total reward: 350.08409941552264
+Rollout 73: avg img_proc=1.14 ms, avg infer=20.54 ms
+Rollout 73: Failure! Total reward: 647.8537883940998
+Rollout 74: avg img_proc=1.00 ms, avg infer=16.69 ms
+Rollout 74: Failure! Total reward: 68.38656871027428
+Rollout 75: avg img_proc=0.95 ms, avg infer=14.21 ms
+Rollout 75: Failure! Total reward: 613.806723069833
+Rollout 76: avg img_proc=0.78 ms, avg infer=13.28 ms
+Rollout 76: Success! Total reward: 77.047207963715
+Rollout 77: avg img_proc=0.99 ms, avg infer=15.69 ms
+Rollout 77: Success! Total reward: 314.2334513490873
+Rollout 78: avg img_proc=1.35 ms, avg infer=19.73 ms
+Rollout 78: Failure! Total reward: 0.0
+Rollout 79: avg img_proc=1.10 ms, avg infer=18.12 ms
+Rollout 79: Failure! Total reward: 3.3629777177397737
+Rollout 80: avg img_proc=0.98 ms, avg infer=15.77 ms
+Rollout 80: Failure! Total reward: 3.160721738499672
+Rollout 81: avg img_proc=0.99 ms, avg infer=15.87 ms
+Rollout 81: Failure! Total reward: 10.62364649367022
+Rollout 82: avg img_proc=0.91 ms, avg infer=14.40 ms
+Rollout 82: Failure! Total reward: 497.4206019560483
+Rollout 83: avg img_proc=0.94 ms, avg infer=15.49 ms
+Rollout 83: Failure! Total reward: 605.7483084689937
+Rollout 84: avg img_proc=0.96 ms, avg infer=15.71 ms
+Rollout 84: Success! Total reward: 47.26910946578226
+Rollout 85: avg img_proc=0.86 ms, avg infer=14.45 ms
+Rollout 85: Success! Total reward: 447.82069790082005
+Rollout 86: avg img_proc=0.92 ms, avg infer=15.22 ms
+Rollout 86: Failure! Total reward: 20.8105133357725
+Rollout 87: avg img_proc=0.91 ms, avg infer=15.56 ms
+Rollout 87: Success! Total reward: 264.28971282698376
+Rollout 88: avg img_proc=1.04 ms, avg infer=17.01 ms
+Rollout 88: Failure! Total reward: 402.41889929319575
+Rollout 89: avg img_proc=0.93 ms, avg infer=15.45 ms
+Rollout 89: Failure! Total reward: 417.36695642816045
+Rollout 90: avg img_proc=0.96 ms, avg infer=14.35 ms
+Rollout 90: Failure! Total reward: 343.3396599933528
+Rollout 91: avg img_proc=1.00 ms, avg infer=15.93 ms
+Rollout 91: Success! Total reward: 378.8599044112915
+Rollout 92: avg img_proc=1.06 ms, avg infer=16.77 ms
+Rollout 92: Failure! Total reward: 110.92748313119661
+Rollout 93: avg img_proc=1.06 ms, avg infer=18.30 ms
+Rollout 93: Failure! Total reward: 6.900578758495739
+Rollout 94: avg img_proc=1.08 ms, avg infer=18.33 ms
+Rollout 94: Success! Total reward: 46.52780270517172
+Rollout 95: avg img_proc=0.78 ms, avg infer=16.73 ms
+Rollout 95: Success! Total reward: 62.823281461885244
+Rollout 96: avg img_proc=1.06 ms, avg infer=16.28 ms
+Rollout 96: Failure! Total reward: 464.1639658753128
+Rollout 97: avg img_proc=1.07 ms, avg infer=16.32 ms
+Rollout 97: Failure! Total reward: 498.95028269301156
+Rollout 98: avg img_proc=1.13 ms, avg infer=17.27 ms
+Rollout 98: Failure! Total reward: 17.329720221272822
+Rollout 99: avg img_proc=0.99 ms, avg infer=15.49 ms
+Rollout 99: Failure! Total reward: 26.490954694186694
+
+==================================================
+Final Statistics:
+Total Rollouts: 100
+Successful Rollouts: 23
+Failed Rollouts: 77
+Global Avg img_proc: 1.06 ms
+Global Avg infer: 17.21 ms

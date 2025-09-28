@@ -35,6 +35,7 @@ from queue import Empty, Queue
 
 import draccus
 import grpc
+from simplify_work.obj_dection.detect_api_with_yolo import YOLOProcessor
 import torch
 
 # 确保能收到客户端发来的depth image
@@ -59,6 +60,9 @@ from lerobot.transport import (
 from lerobot.transport.utils import receive_bytes_in_chunks
 # 根据模型路径判断
 from pathlib import Path
+import atexit
+import signal
+import os
 
 # mtask需要目标识别
 from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
@@ -91,6 +95,18 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         # self.obj_detector=None
         # 新增 统计推理次数
         self.inference_count = 0
+                # 新增统计字段
+        self.total_inference_time = 0.0
+        self.total_image_proc_time = 0.0
+        # self.image_proc_times_list = []  # 保存每次图像处理时间
+        self.stats_file = "inference_stats.txt"
+
+        # 注册退出写文件
+        atexit.register(self._save_stats)
+        signal.signal(signal.SIGINT, self._handle_sigint)
+        self.inference_times_list = []  # 保存每次推理时间
+        self.image_proc_times_list = []  # 保存每次图像处理时间
+
 
     @property
     def running(self):
@@ -176,7 +192,8 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             # task 模式
             lang_mode = model_name.split("mtask_")[1]  # 例如 relative / grid_2cm / grid_5cm
             self.language_tip_mode = lang_mode
-            self.obj_detector = VisionProcessor(language_tip_mode=lang_mode)
+            # self.obj_detector = VisionProcessor(language_tip_mode=lang_mode)
+            self.obj_detector = YOLOProcessor(language_tip_mode=lang_mode)
             print(f"采用的 task 模式: {lang_mode}")
         elif model_name.startswith("mstate_"):
             # state 模式
@@ -262,17 +279,17 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             # Create and return the action chunk
             actions = services_pb2.Actions(data=actions_bytes)
 
-            self.logger.info(
-                f"Action chunk #{obs.get_timestep()} generated | "
-                f"Total time: {(inference_time + serialize_time) * 1000:.2f}ms"
-            )
+            # self.logger.info(
+            #     f"Action chunk #{obs.get_timestep()} generated | "
+            #     f"Total time: {(inference_time + serialize_time) * 1000:.2f}ms"
+            # )
 
-            self.logger.debug(
-                f"Action chunk #{obs.get_timestep()} generated | "
-                f"Inference time: {inference_time:.2f}s |"
-                f"Serialize time: {serialize_time:.2f}s |"
-                f"Total time: {inference_time + serialize_time:.2f}s"
-            )
+            # self.logger.debug(
+            #     f"Action chunk #{obs.get_timestep()} generated | "
+            #     f"Inference time: {inference_time:.2f}s |"
+            #     f"Serialize time: {serialize_time:.2f}s |"
+            #     f"Total time: {inference_time + serialize_time:.2f}s"
+            # )
 
             time.sleep(
                 max(0, self.config.inference_latency - max(0, time.perf_counter() - getactions_starts))
@@ -425,6 +442,7 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         preprocessing_time = time.perf_counter() - start_time
 
         self.last_processed_obs: TimedObservation = observation_t
+        image_proc_time = 0.0
 
         # 推理之前，处理task和state
         # 处理obs中的task
@@ -433,12 +451,18 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             task=observation["task"]
             colored_image=observation["observation.images.side"]
             depth_image=observation["observation.images.side_depth"]
-            # object_keywords = ["sponge", "sachet", "accessory", "router", "sticker","black"]
-            object_keywords = ["sponge", "sachet", "accessory","sticker","black"]
+            object_keywords = ["sponge", "sachet", "accessory", "router", "sticker","black"]
+            # object_keywords = ["sponge", "sachet", "accessory","sticker","black"]
             objects = [obj for obj in object_keywords if obj in task.lower()]
             task_batch = [task]
 
+
+            img_proc_start = time.perf_counter()
             tasks=self.obj_detector.add_depth_info_to_task(colored_image,depth_image,task_batch,objects)
+            image_proc_time = time.perf_counter() - img_proc_start
+
+
+
             task=tasks[0]
             observation["task"]=task
         self.logger.info(f'mtask修改obs.task内容变成：{observation["task"]}')
@@ -471,21 +495,37 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
 
         # 输出总共的推理次数
         self.inference_count += 1
+        self.total_inference_time += inference_time
+        self.total_image_proc_time += image_proc_time
         self.logger.info(f"总共的推理次数: {self.inference_count}")
-
+        avg_inference = self.total_inference_time / self.inference_count
+        avg_img_proc = self.total_image_proc_time / max(1, self.inference_count)
+        # 打印耗时
         self.logger.info(
-            f"Observation {observation_t.get_timestep()} |"
-            f"Inference time: {1000 * (inference_stops - inference_starts):.2f}ms"
+            f"[Obs {observation_t.get_timestep()}] "
+            f"本次推理: {inference_time*1000:.2f}ms | "
+            f"本次图像处理: {image_proc_time*1000:.2f}ms | "
+            f"平均推理: {avg_inference*1000:.2f}ms | "
+            f"平均图像处理: {avg_img_proc*1000:.2f}ms | "
+            f"总推理次数: {self.inference_count}"
         )
+                # 保存到列表
+        self.inference_times_list.append(inference_time)
+        self.image_proc_times_list.append(image_proc_time)
 
-        # full-process latency breakdown for debugging purposes
-        self.logger.debug(
-            f"Observation {observation_t.get_timestep()} | "
-            f"Preprocessing time: {1000 * (preprocessing_time - inference_starts):.2f}ms | "
-            f"Inference time: {1000 * (inference_time - preprocessing_time):.2f}ms | "
-            f"Postprocessing time: {1000 * (postprocessing_time - inference_time):.2f}ms | "
-            f"Total time: {1000 * (postprocessing_time - inference_starts):.2f}ms"
-        )
+        # self.logger.info(
+        #     f"Observation {observation_t.get_timestep()} |"
+        #     f"Inference time: {1000 * (inference_stops - inference_starts):.2f}ms"
+        # )
+
+        # # full-process latency breakdown for debugging purposes
+        # self.logger.debug(
+        #     f"Observation {observation_t.get_timestep()} | "
+        #     f"Preprocessing time: {1000 * (preprocessing_time - inference_starts):.2f}ms | "
+        #     f"Inference time: {1000 * (inference_time - preprocessing_time):.2f}ms | "
+        #     f"Postprocessing time: {1000 * (postprocessing_time - inference_time):.2f}ms | "
+        #     f"Total time: {1000 * (postprocessing_time - inference_starts):.2f}ms"
+        # )
 
         return action_chunk
 
@@ -493,6 +533,24 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         """Stop the server"""
         self._reset_server()
         self.logger.info("Server stopping...")
+
+    def _save_stats(self):
+        """写入 txt 文件，每次写一行：obs_index, inference_time, image_proc_time"""
+        try:
+            with open(self.stats_file, "w") as f:
+                f.write("obs_index,inference_time_sec,image_proc_time_sec\n")
+                for i, (inf_t, img_t) in enumerate(zip(self.inference_times_list, self.image_proc_times_list)):
+                    f.write(f"{i},{inf_t:.6f},{img_t:.6f}\n")
+            self.logger.info(f"已将统计结果保存到 {self.stats_file}")
+        except Exception as e:
+            self.logger.error(f"保存统计结果失败: {e}")
+
+    def _handle_sigint(self, signum, frame):
+        """捕获 Ctrl+C 信号，先保存统计结果再退出"""
+        self.logger.info("收到 Ctrl+C 信号，保存统计结果...")
+        self._save_stats()
+        os._exit(0)  # 立即退出程序
+
 
 
 @draccus.wrap()

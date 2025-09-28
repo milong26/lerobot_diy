@@ -19,7 +19,7 @@ from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
 # output_directory = Path("for_pusht/relative/output")
 # baseline的测试
 # raise KeyError("没改")
-output_directory = Path("for_pusht/mytrain_result_final/10pixel") 
+output_directory = Path("for_pusht/mytrain_result_final_just/10pixel") 
 # relative的测试
 # output_directory = Path("for_pusht/mytrain_result_400time/relative") 
 output_directory.mkdir(parents=True, exist_ok=True)
@@ -32,7 +32,7 @@ device = "cuda"
 # 选择模型文件夹(我也用的绝对路径)
 # pretrained_policy_path = Path("for_pusht/train/checkpoints/last/pretrained_model")
 # raise KeyError("没改")
-pretrained_policy_path = Path("for_pusht/train/mtask_10pixel/checkpoints/026000/pretrained_model")
+pretrained_policy_path = Path("for_pusht/train_just/mtask_10pixel/checkpoints/026000/pretrained_model")
 # pretrained_policy_path = Path("for_pusht/train/relative/checkpoints/026000/pretrained_model")
 policy = SmolVLAPolicy.from_pretrained(pretrained_policy_path)
 

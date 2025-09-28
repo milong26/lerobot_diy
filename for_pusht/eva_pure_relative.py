@@ -11,7 +11,7 @@ import sys
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-print("路径",)
+
 from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
 
 ##===================环境准备====================
@@ -20,7 +20,7 @@ from simplify_work.obj_dection.detector_api_with_opencv import VisionProcessor
 # baseline的测试
 # output_directory = Path("for_pusht/mytrain_result_400time/baseline") 
 # relative的测试
-output_directory = Path("for_pusht/mytrain_result_final/relative") 
+output_directory = Path("for_pusht/result/pure_relative") 
 output_directory.mkdir(parents=True, exist_ok=True)
 
 # Select your device
@@ -30,8 +30,9 @@ device = "cuda"
 # OR a path to a local outputs/train folder.
 # 选择模型文件夹(我也用的绝对路径)
 # pretrained_policy_path = Path("for_pusht/train/checkpoints/last/pretrained_model")
-# pretrained_policy_path = Path("for_pusht/train/baseline/checkpoints/026000/pretrained_model")
-pretrained_policy_path = Path("for_pusht/train/relative/checkpoints/026000/pretrained_model")
+# pretrained_policy_path = Path("for_pusht/train/relative/checkpoints/026000/pretrained_model")
+pretrained_policy_path = Path("for_pusht/train_zuihou/mtask_relative/checkpoints/026000/pretrained_model")
+
 policy = SmolVLAPolicy.from_pretrained(pretrained_policy_path)
 
 # Initialize evaluation environment to render two observation types:
@@ -92,7 +93,7 @@ with open(results_file, "w") as f:
         print(f"Starting rollout {i + 1}/{num_rollouts}")
         # Reset the policy and environments to prepare for rollout
         policy.reset()
-        numpy_observation, info = env.reset(seed=42)
+        numpy_observation, info = env.reset()
 
         # Prepare to collect every rewards and all the frames of the episode,
         # from initial state to final state.
